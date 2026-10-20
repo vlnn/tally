@@ -13,7 +13,8 @@ t parser                 Resume parser #lexer      today 2:40 · last 14:05–no
 t write tests            Start write tests         ↩ from now
 t mail 14:30             Resume mail               from 14:30 · ends parser #lexer at 14:30
 t coffee -20m            Start coffee              from 14:40 · ends parser #lexer at 14:40
-t @today                 Today                     ↩ shows the day
+t @today                 Today                     4:40 logged · ↩ shows the day
+t @week                  This week                 17:15 logged · ↩ shows the week
 ```
 
 A block is the time between one transition and the next. The database holds transitions only
@@ -98,6 +99,26 @@ go by rank of the day's totals, so the biggest group is always `█`. `░` is t
 that nothing claims, `▶` is now, and `▚` marks a block logged more than ten minutes after it
 started. Today's view refreshes every minute. ↩ copies the text.
 
+## The week and the month
+
+`t @week`, `t @lastweek`, `t @month` or `t @lastmonth` open the same view with one line per day
+up to today, the hours shared across the lines, and the totals over the range:
+
+```
+this week · 19 Oct – 25 Oct · 17:15 logged
+
+        06      08      10      12      14      16      18      20      22
+Mon 19  ················▓▓▓▓▓▓▓▓██████████████████████████████████████████████··  13:30
+Tue 20  ·············▒▒▓▓░░░░███████░░░░░███▶···································   3:45
+
+█ #lexer     14:10
+▓ mail        2:30
+▒ #team       0:35
+░ untracked   2:10
+```
+
+Untracked time is counted inside each day, never across nights. A week runs Monday to Sunday.
+
 ## From a terminal
 
 The same commands, the same data:
@@ -108,7 +129,7 @@ uv run tally filter "par" | jq '.items[].title'
 uv run tally act start "parser #lexer"
 at=2026-10-20T14:05 uv run tally act start "parser #lexer"
 uv run tally act stop
-uv run tally today            # or today @yesterday, today 2026-10-19
+uv run tally today            # or today @yesterday, today @week, today 2026-10-19
 ```
 
 Set `db_path` or `alfred_workflow_data` as above so the terminal and Alfred share one database;

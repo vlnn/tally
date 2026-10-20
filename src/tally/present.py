@@ -146,13 +146,17 @@ def stop_row(active: store.Block, now: datetime) -> Row:
     }
 
 
-def view_row(shown: days.Window, day: Day, now: datetime, starts: timedelta) -> Row:
+def view_row(
+    shown: days.Window, db: sqlite3.Connection, now: datetime, starts: timedelta, word: str
+) -> Row:
     name = days.label(shown, now, starts)
-    tally = f"{hm(day.total())} logged · " if name == "today" else ""
+    blocks = store.blocks_within(db, shown.since, shown.until, now)
+    logged = sum((b.length(now) for b in blocks), timedelta())
+    what = "day" if shown.length == 1 else name.split()[-1]
     return {
         "title": name.capitalize(),
-        "subtitle": f"{tally}↩ shows the day",
-        "arg": shown.day.isoformat(),
+        "subtitle": f"{hm(logged)} logged · ↩ shows the {what}",
+        "arg": word,
         "variables": {"action": "view"},
         "mods": NO_MODS,
     }
@@ -171,7 +175,7 @@ def bare_rows(db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[
     active = store.running(db, now)
     if active:
         shown.append(stop_row(active, now))
-    return [*shown, view_row(day.window, day, now, starts)]
+    return [*shown, view_row(day.window, db, now, starts, "@today")]
 
 
 def typed_rows(text: str, db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[Row]:
@@ -193,7 +197,7 @@ def rows(text: str, db: sqlite3.Connection, now: datetime, starts: timedelta) ->
     words = text.split()
     if len(words) == 1 and days.is_rule(words[0]):
         shown = days.asked(words[0], now, starts)
-        return [view_row(shown, Day(db, now, starts), now, starts)] if shown else []
+        return [view_row(shown, db, now, starts, words[0])] if shown else []
     if not words:
         return bare_rows(db, now, starts)
     return typed_rows(text, db, now, starts)

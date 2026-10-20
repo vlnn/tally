@@ -60,9 +60,13 @@ def cell_glyph(
 
 
 def strip(
-    window: days.Window, blocks: list[store.Block], glyphs: dict[str, str], now: datetime
+    window: days.Window,
+    blocks: list[store.Block],
+    glyphs: dict[str, str],
+    now: datetime,
+    span: tuple[int, int] | None = None,
 ) -> str:
-    first, last = hours(window, blocks, now)
+    first, last = span or hours(window, blocks, now)
     cells = []
     moment = window.since + timedelta(hours=first)
     until = window.since + timedelta(hours=last)
@@ -73,8 +77,13 @@ def strip(
     return "".join(cells)
 
 
-def scale(window: days.Window, blocks: list[store.Block], now: datetime) -> str:
-    first, last = hours(window, blocks, now)
+def scale(
+    window: days.Window,
+    blocks: list[store.Block],
+    now: datetime,
+    span: tuple[int, int] | None = None,
+) -> str:
+    first, last = span or hours(window, blocks, now)
     marks = ""
     for hour in range(first, last, 2):
         marks = marks.ljust((hour - first) * 4) + f"{(window.since + timedelta(hours=hour)):%H}"
@@ -88,10 +97,12 @@ def untracked(blocks: list[store.Block], now: datetime) -> timedelta:
     return min(blocks[-1].end or now, now) - blocks[0].start - covered
 
 
-def totals(found: list[Group], blocks: list[store.Block], now: datetime) -> str:
+def totals(
+    found: list[Group], blocks: list[store.Block], now: datetime, gap: timedelta | None = None
+) -> str:
     width = max([len(g.name) for g in found] + [9])
     lines = [f"{g.glyph} {g.name.ljust(width)}  {hm(g.total):>5}" for g in found]
-    gap = untracked(blocks, now)
+    gap = untracked(blocks, now) if gap is None else gap
     if gap:
         lines.append(f"{UNTRACKED} {'untracked'.ljust(width)}  {hm(gap):>5}")
     if any(b.backfilled for b in blocks):
@@ -129,9 +140,64 @@ def render(window: days.Window, blocks: list[store.Block], now: datetime, starts
     return "\n\n".join(parts)
 
 
+def inside(blocks: list[store.Block], day: days.Window, now: datetime) -> list[store.Block]:
+    return [
+        b.clipped(day.since, day.until, now)
+        for b in blocks
+        if (b.end or now) > day.since and b.start < day.until
+    ]
+
+
+def range_heading(window: days.Window, blocks: list[store.Block], now: datetime, starts) -> str:
+    logged = sum((b.length(now) for b in blocks), timedelta())
+    last = window.day + timedelta(days=window.length - 1)
+    name = days.label(window, now, starts)
+    return f"**{name} · {window.day:%-d %b} – {last:%-d %b}** · {hm(logged)} logged"
+
+
+def day_line(
+    day: days.Window,
+    mine: list[store.Block],
+    glyphs: dict[str, str],
+    now: datetime,
+    span: tuple[int, int],
+) -> str:
+    logged = sum((b.length(now) for b in mine), timedelta())
+    total = hm(logged) if mine else ""
+    return f"{day.day:%a} {day.day.day:>2}  {strip(day, mine, glyphs, now, span)}  {total:>5}"
+
+
+def common_span(
+    per_day: list[tuple[days.Window, list[store.Block]]], now: datetime
+) -> tuple[int, int]:
+    spans = [hours(day, mine, now) for day, mine in per_day]
+    return min(s[0] for s in spans), max(s[1] for s in spans)
+
+
+def render_range(
+    window: days.Window, blocks: list[store.Block], now: datetime, starts: timedelta
+) -> str:
+    if not blocks:
+        return f"{range_heading(window, blocks, now, starts)}\n\nNothing logged."
+    found = groups(blocks, now)
+    glyphs = {g.name: g.glyph for g in found}
+    per_day = [(d, inside(blocks, d, now)) for d in window.days() if d.since <= now]
+    span = common_span(per_day, now)
+    lines = [day_line(d, mine, glyphs, now, span) for d, mine in per_day]
+    scale_line = " " * 8 + scale(window, [], now, span)
+    gap = sum((untracked(mine, now) for _, mine in per_day), timedelta())
+    parts = [
+        range_heading(window, blocks, now, starts),
+        "```\n" + "\n".join([scale_line, *lines]) + "\n```",
+        f"```\n{totals(found, blocks, now, gap)}\n```",
+    ]
+    return "\n\n".join(parts)
+
+
 def shown(db, word: str, now: datetime, starts: timedelta) -> tuple[days.Window, str] | None:
     window = days.asked(word, now, starts)
     if window is None:
         return None
     blocks = store.blocks_within(db, window.since, window.until, now)
-    return window, render(window, blocks, now, starts)
+    draw = render_range if window.length > 1 else render
+    return window, draw(window, blocks, now, starts)

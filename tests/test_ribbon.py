@@ -83,3 +83,20 @@ def test_shown_names_a_day(db, sample):
         "yesterday is empty in the sample"
     )
     assert ribbon.shown(db, "parser", NOW, NO_OFFSET) is None, "a non-day word is refused"
+
+
+def test_a_week_is_a_line_per_day_with_shared_totals(db, sample, logged):
+    logged(10, 0, "mail", day=NOW.date() - timedelta(days=1))
+    logged(12, 0, "", day=NOW.date() - timedelta(days=1))
+    _window, text = ribbon.shown(db, "@week", NOW, NO_OFFSET)
+    lines = text.split("```")[1].splitlines()
+    assert lines[2].startswith("Mon 19  ") and lines[2].endswith("   2:00"), "yesterday's line"
+    assert lines[3].startswith("Tue 20  ") and lines[3].endswith("   4:40"), "today's line"
+    assert len(lines) == 4, "future days are not drawn"
+    assert "▓ mail            2:30" in text, "totals span the days"
+    assert "░ untracked       1:15" in text, "untracked is counted within each day, not between"
+    assert text.startswith("**this week · 19 Oct – 25 Oct** · 6:40 logged"), "the range heading"
+
+
+def test_an_empty_range(db):
+    assert ribbon.shown(db, "@lastmonth", NOW, NO_OFFSET)[1].endswith("Nothing logged."), "empty"

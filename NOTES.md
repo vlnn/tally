@@ -8,10 +8,10 @@ data folder) and nothing of the kernel.
 | Module      | Owns                                                                  | Grows when                            |
 | ----------- | --------------------------------------------------------------------- | ------------------------------------- |
 | `store`     | the table of transitions; blocks, running, tasks, spelling            | a transition gets a column, a new read |
-| `days`      | when a day starts, which day a moment is, the `@today` rule words     | a new rule word                       |
+| `days`      | when a day starts, which day a moment is, the `@today`/`@week` words  | a new rule word                       |
 | `timewords` | the last word of a line as a time                                     | a new way to say when                 |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
-| `ribbon`    | the day as cells, groups, totals, the block list                      | the view shows something new          |
+| `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
 | `cli`       | subcommands, settings, the database path                              | a new subcommand, a new setting       |
 
@@ -56,10 +56,9 @@ subtitle spells this out before ↩.
   filter is the shape.
 - **Day-end cap.** `t @yesterday` noticing a block that ran all night and offering a stop at a
   setting or at the time the Mac slept (`pmset -g log`). A plan row: describe, act on ↩.
-- **Week and month.** `@week` and `@month` as seven or thirty ribbons stacked with a total per
-  day, and the totals table over the range; `days.asked` returns a `Window`, so a range is a
-  wider window and the ribbon's `scale` learns to label days. The tally the README mentions for
-  yesterday, last week and last month lives here.
+- **Ranges of your own.** `@week` and `@month` (and their `last`) are the only ranges; `2026-10`
+  or `2026-10-12..2026-10-18` would be two more lines in `days.asked`, and `range_label` would
+  need to say a date range instead of this/last.
 - **Pull from wisp.** A setting pointing at the log folder, and `t` listing open `.` tasks as
   start rows. One read of that folder; `wisp.records.read_folder` is the reader.
 - **Icons per block.** A disc with the block drawn as a sector on a 24-hour face, cached by

@@ -47,7 +47,7 @@ def test_bare_list_ends_with_stop_and_today(db, sample):
     assert rows[-2]["subtitle"] == "parser #lexer · 0:55 since 14:05", "stop says what it ends"
     assert rows[-2]["variables"] == {"action": "stop"}, "stop is its own action"
     assert rows[-1]["subtitle"] == "4:40 logged · ↩ shows the day", "the day's tally"
-    assert rows[-1]["variables"] == {"action": "view"} and rows[-1]["arg"] == "2026-10-20", (
+    assert rows[-1]["variables"] == {"action": "view"} and rows[-1]["arg"] == "@today", (
         "↩ opens the view on that date"
     )
 
@@ -177,8 +177,8 @@ def test_a_rule_word_offers_the_view(db, sample):
     assert rows == [
         {
             "title": "Yesterday",
-            "subtitle": "↩ shows the day",
-            "arg": "2026-10-19",
+            "subtitle": "0:00 logged · ↩ shows the day",
+            "arg": "@yesterday",
             "variables": {"action": "view"},
             "mods": present.NO_MODS,
         }
@@ -193,3 +193,12 @@ def test_the_day_boundary_moves_the_tally(db, logged):
     assert (midnight, four) == ("1:00 logged · ↩ shows the day", "0:00 logged · ↩ shows the day"), (
         "with the day starting at 04:00, one o'clock belongs to yesterday"
     )
+
+
+def test_a_range_word_offers_the_range(db, sample):
+    rows = present.rows("@week", db, NOW, NO_OFFSET)
+    assert (rows[0]["title"], rows[0]["subtitle"], rows[0]["arg"]) == (
+        "This week",
+        "4:40 logged · ↩ shows the week",
+        "@week",
+    ), "the week's tally and its view"
