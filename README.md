@@ -1,0 +1,127 @@
+# tally
+
+Time logging by switching tasks, from Alfred. Type `t`, pick what you are doing, and the
+clock follows: starting anything ends whatever was running, so there is no timer to remember.
+
+```
+t                        Resume review pr 212      today 0:25 · last 13:40–14:05    ← ↩ toggles back
+                         Resume call with ola      today 0:30 · last 13:10–13:40
+                         Resume mail               today 0:30 · last 09:40–10:10
+                         Stop                      parser #lexer · 0:55 since 14:05
+                         Today                     4:40 logged · ↩ shows the day
+t parser                 Resume parser #lexer      today 2:40 · last 14:05–now
+t write tests            Start write tests         ↩ from now
+t mail 14:30             Resume mail               from 14:30 · ends parser #lexer at 14:30
+t coffee -20m            Start coffee              from 14:40 · ends parser #lexer at 14:40
+t @today                 Today                     ↩ shows the day
+```
+
+A block is the time between one transition and the next. The database holds transitions only
+(`at`, `line`, `logged_at`); blocks, gaps, tallies and the ribbon are all read from that, so
+nothing stored can disagree with anything else.
+
+## Install
+
+1. Build `dist/tally.alfredworkflow` with `make build` (or take it from Releases) and
+   double-click it.
+2. Optional: **Database folder**, if you want `tally.db` somewhere you can see. Empty means
+   Alfred's data folder for the workflow, which survives updates.
+3. Optional: **Day starts at**. With `04:00`, work at one in the morning belongs to the evening
+   before. Every tally is recomputed from this, so changing it changes history too.
+4. The hotkey object is wired for HYPER+T (⌃⌥⇧⌘T). Alfred clears hotkeys on import, so
+   double-click it once and press the combination you want.
+
+Nothing to install: the bundle runs on macOS's own `/usr/bin/python3` (3.9+) with the standard
+library only.
+
+## The list
+
+Bare `t` shows the previous task first, so `t ↩` goes back to it and `t ↩` again returns: two
+tasks toggle with three keystrokes. Below it, the other tasks of the last seven days, newest
+start first, at most seven; then **Stop**, which says what is running and for how long; then
+**Today**, whose subtitle is the day's tally and whose ↩ opens the ribbon.
+
+Typing replaces the list: the first row starts what you typed (**Start**) or resumes it when a
+task with that line exists (**Resume**, with the line as it was first written); the rows below
+are every past task matching by word prefix, newest start first, each ↩ resuming it verbatim.
+
+| Key  | On a task row                                                                       |
+| ---- | ----------------------------------------------------------------------------------- |
+| ↩    | start now                                                                           |
+| ⇧↩   | start where the last block ended, filling the gap (only when nothing is running)    |
+| ⌘C   | copy the line                                                                       |
+| ⌘L   | large type                                                                          |
+
+Two tasks are the same task when their lines are the same after folding case, diacritics and
+spacing. `parser #lexer` and `parser` are two tasks. A `#tag` anywhere in the line groups the
+ribbon and nothing else.
+
+## Backfill
+
+The last word of what you type may be a time: `14:05`, `9:30`, `-20m`, `-1h`, `-1h20m`. The
+block starts then instead of now, and the row's subtitle says what that does before you press ↩:
+
+- later than the running task started: `from 14:30 · ends parser at 14:30`
+- earlier than it started: `11:30–14:05, before parser (which keeps running) · cuts call at 11:30`,
+  a past block is inserted and the running task is untouched
+
+A time in the future, or a time with no words before it, is one row that explains why it cannot
+act.
+
+## The day
+
+`t @today`, `t @yesterday` or `t 2026-10-19` and ↩ open a Text View:
+
+```
+today · Tue 20 Oct · 4:40 logged
+
+06      08      10      12      14      16      18      20
+·············▓▓▞▞░░░░███████░▒▒▙▙███▶···························
+
+█ #lexer          2:40
+▓ #team           0:35
+▒ call with ola   0:30
+▞ mail            0:30
+▙ review pr 212   0:25
+░ untracked       1:15
+
+09:05–09:40   0:35  standup #team
+09:40–10:10   0:30  mail
+11:05–12:50   1:45  parser #lexer
+13:10–13:40   0:30  call with ola
+13:40–14:05   0:25  review pr 212
+14:05–now     0:55  parser #lexer
+```
+
+One cell is fifteen minutes; 06 to 22 is shown and widened when a block falls outside. Glyphs
+go by rank of the day's totals, so the biggest group is always `█`. `░` is time between blocks
+that nothing claims, `▶` is now, and `▚` marks a block logged more than ten minutes after it
+started. Today's view refreshes every minute. ↩ copies the text.
+
+## From a terminal
+
+The same commands, the same data:
+
+```
+export alfred_workflow_data="$HOME/Library/Application Support/Alfred/Workflow Data/com.anokhin.tally"
+uv run tally filter "par" | jq '.items[].title'
+uv run tally act start "parser #lexer"
+at=2026-10-20T14:05 uv run tally act start "parser #lexer"
+uv run tally act stop
+uv run tally today            # or today @yesterday, today 2026-10-19
+```
+
+Set `db_path` or `alfred_workflow_data` as above so the terminal and Alfred share one database;
+without either, the CLI uses `~/.local/share/hoard/tally`, a separate copy.
+
+## Development
+
+```
+uv sync
+uv run pytest
+uv run --isolated --python 3.9 pytest    the interpreter the workflow runs on
+make lint                                ruff, mypy
+make check                               build, import from the bundle, smoke it
+```
+
+`NOTES.md` lists what is deliberately not here yet and where it would go.

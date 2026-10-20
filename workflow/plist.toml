@@ -1,0 +1,8 @@
+kind = "tally"
+name = "Tally"
+bundleid = "com.anokhin.tally"
+description = "Log time by switching tasks: type t, resume, stop, see the day"
+createdby = "Volodymyr Anokhin"
+plist = "workflow/info.plist"
+source = "src"
+assets = ["workflow/view"]
