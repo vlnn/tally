@@ -11,6 +11,9 @@ from typing import TypedDict
 from hoard.alfred import matches
 
 from tally import commands, days, store, timewords
+from tally.scope import Scope
+
+EVERYTHING = Scope()
 
 RECENT_DAYS = 7
 RECENT_LIMIT = 7
@@ -134,8 +137,9 @@ def effect(at: datetime, db: sqlite3.Connection, now: datetime) -> str:
     return f"{at:%H:%M}–{active.start:%H:%M}, before {active.line} (which keeps running){cut}"
 
 
-def start_row(typed: timewords.Typed, db: sqlite3.Connection, now: datetime) -> Row:
-    known = store.spelled(db, typed.line)
+def start_row(
+    typed: timewords.Typed, known: str | None, db: sqlite3.Connection, now: datetime
+) -> Row:
     line = known or typed.line
     verb = "Resume" if known else "Start"
     subtitle = effect(typed.at, db, now) if typed.at else "↩ from now"
@@ -177,16 +181,27 @@ def unknown_day_row(word: str) -> Row:
     }
 
 
+def scoped_total(blocks: list[store.Block], now: datetime, scope: Scope) -> str:
+    under = [b for b in blocks if scope.holds(b.line)]
+    return f" · {scope.label} {hm(sum((b.length(now) for b in under), timedelta()))}"
+
+
 def view_row(
-    shown: days.Window, db: sqlite3.Connection, now: datetime, starts: timedelta, word: str
+    shown: days.Window,
+    db: sqlite3.Connection,
+    now: datetime,
+    starts: timedelta,
+    word: str,
+    scope: Scope = EVERYTHING,
 ) -> Row:
     name = days.label(shown, now, starts)
     blocks = store.blocks_within(db, shown.since, shown.until, now)
     logged = sum((b.length(now) for b in blocks), timedelta())
     what = "day" if shown.length == 1 else name.split()[-1]
+    part = scoped_total(blocks, now, scope) if scope.tag else ""
     return {
         "title": name.capitalize(),
-        "subtitle": f"{hm(logged)} logged · ↩ shows the {what}",
+        "subtitle": f"{hm(logged)} logged{part} · ↩ shows the {what}",
         "arg": word,
         "variables": {"action": "view"},
         "mods": NO_MODS,
@@ -221,33 +236,49 @@ def nudge_row(on: bool, described: str) -> Row:
     }
 
 
-def recent(db: sqlite3.Connection, now: datetime) -> list[store.Task]:
+def recent(db: sqlite3.Connection, now: datetime, scope: Scope = EVERYTHING) -> list[store.Task]:
     active = store.running(db, now)
     found = store.tasks(db, now - timedelta(days=RECENT_DAYS), now)
-    others = [t for t in found if not (active and store.same_task(t.line, active.line))]
+    others = [
+        t
+        for t in found
+        if scope.holds(t.line) and not (active and store.same_task(t.line, active.line))
+    ]
     return others[:RECENT_LIMIT]
 
 
-def bare_rows(db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[Row]:
+def bare_rows(
+    db: sqlite3.Connection, now: datetime, starts: timedelta, scope: Scope = EVERYTHING
+) -> list[Row]:
     day = Day(db, now, starts)
-    shown = [resume_row(task, day, db, now) for task in recent(db, now)]
+    shown = [resume_row(task, day, db, now) for task in recent(db, now, scope)]
     active = store.running(db, now)
     if active:
         shown.append(stop_row(active, now))
-    return [*shown, view_row(day.window, db, now, starts, "@today")]
+    return [*shown, view_row(day.window, db, now, starts, "@today", scope)]
 
 
-def typed_rows(text: str, db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[Row]:
+def known_spelling(found: list[store.Task], line: str, scope: Scope) -> str | None:
+    return next((task.line for task in found if scope.same(task.line, line)), None)
+
+
+def typed_rows(
+    text: str, db: sqlite3.Connection, now: datetime, starts: timedelta, scope: Scope = EVERYTHING
+) -> list[Row]:
     typed = timewords.parse(text, now)
     if typed.problem:
         return [invalid_row(typed)]
+    typed = typed._replace(line=scope.apply(typed.line))
     day = Day(db, now, starts)
-    top = start_row(typed, db, now)
     found = store.tasks(db, datetime.min, now)
+    top = start_row(typed, known_spelling(found, typed.line, scope), db, now)
+    wanted = timewords.parse(text, now).line
     similar = [
         resume_row(task, day, db, now)
         for task in found
-        if matches(typed.line, task.line) and not store.same_task(task.line, typed.line)
+        if scope.holds(task.line)
+        and matches(wanted, task.line)
+        and not scope.same(task.line, typed.line)
     ]
     return [top, *similar]
 
@@ -284,13 +315,14 @@ def rows(
     starts: timedelta,
     plugin: Callable[[], Path | None] = lambda: None,
     nudges: Callable[[], tuple[bool, str]] = lambda: (False, ""),
+    scope: Scope = EVERYTHING,
 ) -> list[Row]:
     words = text.split()
     if not words:
-        return bare_rows(db, now, starts)
+        return bare_rows(db, now, starts, scope)
     if len(words) == 1 and days.DATE.match(words[0]):
         return date_rows(words[0], db, now, starts)
     found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]
     if text.lstrip().startswith("@"):
         return found or [unknown_day_row(words[0])]
-    return [*found, *typed_rows(text, db, now, starts)]
+    return [*found, *typed_rows(text, db, now, starts, scope)]

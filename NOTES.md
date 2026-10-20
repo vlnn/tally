@@ -13,6 +13,7 @@ data folder) and nothing of the kernel.
 | `commands`  | words that name a command (stop, today, week, bar…) and their prefixes | a new command word                   |
 | `tags`      | tags in a line, aliases from the setting, time under each tag          | a tag gets a meaning beyond grouping  |
 | `nudge`     | when to nudge and what to say, the launchd agent, how long the user has been idle | a new reason to stay quiet |
+| `scope`     | which tasks a list is about (all, or one tag), adding that tag, task identity across aliases | a list scoped by more than one tag |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |

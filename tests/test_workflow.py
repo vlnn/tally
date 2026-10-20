@@ -91,15 +91,27 @@ def test_hotkeys_open_t_or_stop(plist, objects):
     kinds = sorted(
         target["config"].get("keyword") or target["config"]["script"].strip() for target in targets
     )
-    assert kinds == ["/usr/bin/python3 -m tally act stop", "t"], (
-        "one hotkey opens t, the other stops without opening Alfred"
+    assert kinds == ["/usr/bin/python3 -m tally act stop", "t", "tw"], (
+        "HYPER+] opens t, HYPER+[ opens tw, the third stops without opening Alfred"
     )
+
+
+def test_the_two_list_hotkeys_are_the_brackets(plist, objects):
+    keys = {
+        objects[plist["connections"][uid][0]["destinationuid"]]["config"]["keyword"]: obj["config"][
+            "hotstring"
+        ]
+        for uid, obj in objects.items()
+        if obj["type"] == "alfred.workflow.trigger.hotkey" and obj["config"]["hotstring"]
+    }
+    assert keys == {"t": "]", "tw": "["}, "] for everything, [ for work"
 
 
 def test_alt_return_from_the_filter_reaches_act(plist, objects):
     filters = [u for u, o in objects.items() if o["type"] == "alfred.workflow.input.scriptfilter"]
-    modifiers = {link["modifiers"] for link in plist["connections"][filters[0]]}
-    assert modifiers == {0, 131072, 524288}, "↩, ⇧↩ and ⌥↩ all pass through to the conditional"
+    for uid in filters:
+        modifiers = {link["modifiers"] for link in plist["connections"][uid]}
+        assert modifiers == {0, 131072, 524288}, "↩, ⇧↩ and ⌥↩ pass through from both lists"
 
 
 def test_the_text_view_runs_the_shipped_script(objects):

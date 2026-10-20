@@ -11,7 +11,7 @@ from typing import Callable
 
 from hoard.alfred import data_folder
 
-from tally import bar, days, nudge, present, store, tags, view
+from tally import bar, days, nudge, present, scope, store, tags, view
 
 NAME = "tally"
 DB_NAME = "tally.db"
@@ -57,11 +57,19 @@ def say(text: str) -> int:
     return 0
 
 
-def filter_command(args: list[str], ctx: Context) -> int:
-    text = args[0] if args else ""
+def listed(text: str, ctx: Context, chosen: scope.Scope) -> int:
     plugin = lambda: bar.plugin_path(ctx.env)  # noqa: E731
     nudges = lambda: (nudge.installed(), nudge.describe(nudge.settings(ctx.env)))  # noqa: E731
-    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts, plugin, nudges))
+    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts, plugin, nudges, chosen))
+
+
+def filter_command(args: list[str], ctx: Context) -> int:
+    return listed(args[0] if args else "", ctx, scope.Scope("", ctx.aliases))
+
+
+def filter_work_command(args: list[str], ctx: Context) -> int:
+    work = scope.work(ctx.env.get("work_tag", ""), ctx.aliases)
+    return listed(args[0] if args else "", ctx, work)
 
 
 def start_command(args: list[str], ctx: Context) -> int:
@@ -143,6 +151,7 @@ ACTIONS: dict[str, Command] = {
 
 COMMANDS: dict[str, Command] = {
     "filter": filter_command,
+    "filter-work": filter_work_command,
     **ACTIONS,
     "act": act_command,
     "view": view_command,

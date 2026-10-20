@@ -20,6 +20,19 @@ t st                     Stop                      parser #lexer · 0:55 since 1
 t to                     Today                     4:40 logged · ↩ shows the day
 ```
 
+## Work
+
+HYPER+[ (or the keyword `tw`) opens the same list for work only:
+
+- the bare list shows only tasks tagged `#w` (or `#work`, or however **Tag aliases** spells it),
+  and the Today row adds the work share, `6:00 logged · #work 2:30`;
+- whatever you start gets `#w` added unless it already carries it, so `parser` becomes
+  `parser #w`, and `parser` resumes `parser #w` if that exists;
+- typed matches are work tasks only; backfill, ⇧↩, ⌥↩ and the command words work as in `t`.
+
+HYPER+] (`t`) is unchanged: everything, no tag added. **Work tag** in the settings is `w`;
+set it to `job` and HYPER+[ is about `#job`.
+
 ## Stopping
 
 Three ways, fastest first:
@@ -76,9 +89,9 @@ nothing stored can disagree with anything else.
    `#w` counts as `#work`. Add more with commas, `w=work, l=lexer`.
 4. Optional: **Day starts at**. With `04:00`, work at one in the morning belongs to the evening
    before. Every tally is recomputed from this, so changing it changes history too.
-5. The hotkey objects are wired for HYPER+T (⌃⌥⇧⌘T) to open `t` and nothing yet to stop.
-   Alfred clears hotkeys on import, so double-click each once and press the combination you
-   want.
+5. The hotkey objects are wired for HYPER+] (⌃⌥⇧⌘]) to open `t`, HYPER+[ to open `tw`, and
+   nothing yet to stop. Alfred clears hotkeys on import, so double-click each once and press the
+   combination you want.
 
 ## Requirements
 
@@ -175,8 +188,8 @@ untagged    0:30
 Short tags from **Tag aliases** are spelled out before anything is counted: with `w=work`,
 `mail #w`, `review #W` and `parser #work` are all `#work`, on the ribbon, in the totals and in
 this table. The block list keeps the lines as you typed them. Aliases are applied when reading,
-so adding one regroups history too. They do not make `parser #w` and `parser #work` one task
-for resuming; that is still the line as written.
+so adding one regroups history too. They also make `parser #w` and `parser #work` one task for
+resuming: typing either finds the other.
 
 ## The week and the month
 
