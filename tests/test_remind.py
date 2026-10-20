@@ -12,6 +12,17 @@ from tally import cli, present, remind
     "text, at, said",
     [
         ("+15m stop the work", datetime(2026, 10, 20, 15, 15), "stop the work"),
+        ("+15 stop the work", datetime(2026, 10, 20, 15, 15), "stop the work"),
+        ("+15 min stop the work", datetime(2026, 10, 20, 15, 15), "stop the work"),
+        ("+15 m stop the work", datetime(2026, 10, 20, 15, 15), "stop the work"),
+        ("+15min stop", datetime(2026, 10, 20, 15, 15), "stop"),
+        ("+15 minutes stop", datetime(2026, 10, 20, 15, 15), "stop"),
+        ("+15 Min stop", datetime(2026, 10, 20, 15, 15), "stop"),
+        ("+2 h review", datetime(2026, 10, 20, 17, 0), "review"),
+        ("+1 hour 30 min call", datetime(2026, 10, 20, 16, 30), "call"),
+        ("+1h 30m call", datetime(2026, 10, 20, 16, 30), "call"),
+        ("+15 meeting notes", datetime(2026, 10, 20, 15, 15), "meeting notes"),
+        ("+15 m", None, ""),
         ("+1h stretch", datetime(2026, 10, 20, 16, 0), "stretch"),
         ("+1h30m call mum", datetime(2026, 10, 20, 16, 30), "call mum"),
         ("21:00 stand up", datetime(2026, 10, 20, 21, 0), "stand up"),
@@ -25,14 +36,30 @@ from tally import cli, present, remind
     ],
 )
 def test_a_time_first_is_a_reminder(text, at, said):
-    assert remind.wanted(text, NOW) == remind.Wanted(at, said), (
-        "+duration from now, a clock time today or else tomorrow"
+    found = remind.wanted(text, NOW)
+    if at is None:
+        assert found.problem == "Type what to remind you of after the time", "a time alone asks"
+        return
+    assert found == remind.Wanted(at, said), (
+        "+duration from now, with or without a unit, or a clock time today or else tomorrow"
     )
 
 
 @pytest.mark.parametrize(
     "text",
-    ["parser", "parser 14:30", "pr 212", "-15m coffee", "+ x", "+0m x", "25:00 x", "13pm x", ""],
+    [
+        "parser",
+        "parser 14:30",
+        "pr 212",
+        "-15m coffee",
+        "+ x",
+        "+0m x",
+        "+0 x",
+        "+ m x",
+        "25:00 x",
+        "13pm x",
+        "",
+    ],
 )
 def test_anything_else_is_not_a_reminder(text):
     assert remind.wanted(text, NOW) is None, "a time last is a backfill, words are a task"

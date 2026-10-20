@@ -865,7 +865,7 @@ t st ↩        stop (any command word works from two letters: to, yes, we, la, 
               its time stays; its blocks are listed below to retime or delete one
               on Today: tag the whole day. ⌘↩ does the same.
 t undo        take the last edit back
-t +15m stop   a reminder in big letters: +15m, +1h30m, 21:00, 9pm, 9:30PM, then the text
+t +15m stop   a reminder in big letters: +15, +15 min, +1h30m, 21:00, 9pm, then the text
               pending ones are listed in t; ↩ on one cancels it
 t nudge       turn nudges on or off: every 15 min, a notification you can ignore
 The second hotkey stops the running task without opening Alfred: give it a key.

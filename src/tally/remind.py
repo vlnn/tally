@@ -20,7 +20,11 @@ from tally.nudge import BUNDLE_ID, domain, launchctl
 
 TRIGGER = "remind"
 PREFIX = "com.anokhin.tally.remind"
-IN = re.compile(r"^\+(?:(\d+)h)?(?:(\d+)m)?$")
+IN = re.compile(
+    r"^\+\s*(?:(\d+)\s*(?:h|hr|hrs|hour|hours))?\s*(?:(\d+)\s*(?:m|min|mins|minute|minutes)?)?$",
+    re.IGNORECASE,
+)
+MOST_WORDS = 4
 CLOCK = re.compile(r"^(\d{1,2}):(\d{2})$")
 MERIDIEM = re.compile(r"^(\d{1,2})(?::(\d{2}))?(am|pm)$", re.IGNORECASE)
 
@@ -40,13 +44,23 @@ class Wanted(NamedTuple):
     problem: str = ""
 
 
-def after(word: str, now: datetime) -> datetime | None:
-    found = IN.match(word)
-    if not found or word == "+":
+def after(phrase: str, now: datetime) -> datetime | None:
+    """`+15`, `+15m`, `+15 min`, `+1h30m`, `+1 hour 30 min`: that long from now."""
+    found = IN.match(phrase)
+    if not found:
         return None
     hours, minutes = (int(part) if part else 0 for part in found.groups())
     span = timedelta(hours=hours, minutes=minutes)
-    return now + span if span else None
+    return (now + span).replace(second=0, microsecond=0) if span else None
+
+
+def relative(words: list[str], now: datetime) -> tuple[datetime, int] | None:
+    """The longest run of leading words that reads as a duration, and how many it took."""
+    for taken in range(min(MOST_WORDS, len(words)), 0, -1):
+        at = after(" ".join(words[:taken]), now)
+        if at:
+            return at, taken
+    return None
 
 
 def clock(hour: int, minute: int) -> time | None:
@@ -69,23 +83,24 @@ def next_at(moment: time, now: datetime) -> datetime:
     return today if today > now else today + timedelta(days=1)
 
 
-def when(word: str, now: datetime) -> datetime | None:
-    relative = after(word, now)
-    if relative:
-        return relative.replace(second=0, microsecond=0)
-    moment = wall(word)
-    return next_at(moment, now) if moment else None
+def when(words: list[str], now: datetime) -> tuple[datetime, int] | None:
+    found = relative(words, now)
+    if found:
+        return found
+    moment = wall(words[0])
+    return (next_at(moment, now), 1) if moment else None
 
 
 def wanted(text: str, now: datetime) -> Wanted | None:
-    """A reminder when the first word is a time to come, otherwise None."""
+    """A reminder when the text starts with a time to come, otherwise None."""
     words = text.split()
     if not words:
         return None
-    at = when(words[0], now)
-    if at is None:
+    found = when(words, now)
+    if found is None:
         return None
-    rest = " ".join(words[1:])
+    at, taken = found
+    rest = " ".join(words[taken:])
     if not rest:
         return Wanted(at, "", "Type what to remind you of after the time")
     return Wanted(at, rest)
