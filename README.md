@@ -33,6 +33,13 @@ HYPER+[ (or the keyword `tw`) opens the same list for work only:
 HYPER+] (`t`) is unchanged: everything, no tag added. **Work tag** in the settings is `w`;
 set it to `job` and HYPER+[ is about `#job`.
 
+## Removing old entries
+
+**⌘↩** on a task row (or Stop, or a day row) opens its edit list with `delete` already typed:
+the row says what goes (`Delete 2 blocks · 2:40 · every block of parser becomes untracked`)
+and ↩ there removes it, so a stray ⌘↩ removes nothing. Typing `delete` in any edit list does
+the same: for one block, a whole task, or a whole day. `t undo` brings it back.
+
 ## Editing and tagging afterwards
 
 Find the task the usual way, by typing in `t` or `tw` or among the recent ones, and press
@@ -63,8 +70,6 @@ With nothing typed, these show as hints; ⇥ fills one in. An edit that cannot b
 before the previous block, an end past the next one, a time that has not happened) is one row
 saying why. **⌃↩ on the Today row** (or Yesterday, or a date) tags every block that day.
 
-⌘↩ does everything ⌃↩ does, in case your Alfred keeps ⌃↩ for its own fallback searches.
-
 **`t undo`** shows the last edit and ↩ takes it back; again for the one before. Tags follow
 **Tag aliases**, so adding `#w` to `parser #work` changes nothing, and `-#work` removes `#w`.
 Moving a block's start earlier than when it was logged marks it backfilled on the ribbon.
@@ -91,8 +96,10 @@ t 9PM go out              Remind 21:00: go out
 t 9:00 standup            Remind tomorrow 09:00: standup   (9:00 has passed today)
 ```
 
-`+15`, `+15m`, `+15 m`, `+15 min` (all fifteen minutes), `+2h`, `+2 hours`, `+1h30m`, `+1 hour 30 min`
-count from now; a bare number is minutes; `21:00`, `9pm`, `9:30PM` are today, or tomorrow when
+`+15`, `+15m`, `+15 m`, `+15 min` (all fifteen minutes), `+2h`, `+2 hours`, `+1h30m`, `+1 hour 30 min`,
+`+30s`, `+30 sec`, `+1m30s` count from now; a bare number is minutes. Without seconds a reminder
+lands on the minute and survives sleep; with seconds it is a countdown to the second, which
+launchd can miss if the Mac sleeps through it; `21:00`, `9pm`, `9:30PM` are today, or tomorrow when
 already past. At that minute Alfred shows the text in Large Type across the screen; with the
 SwiftBar plugin a clickable notification stays behind too. If the Mac sleeps through it, it
 shows on wake. Pending reminders are listed in bare `t` (`⏰ 21:00 stand up · in 6:00`), and ↩

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -91,7 +91,36 @@ def test_a_day_takes_tags_only(db, sample):
 
 
 def test_a_task_refuses_block_words(db, sample):
-    assert plan(db, "task:parser #lexer", "delete").title == "delete is for one block"
+    assert plan(db, "task:parser #lexer", "start 9:00").title == "start is for one block"
+
+
+def test_delete_a_whole_task(db, sample):
+    found = plan(db, "task:parser #lexer", "delete")
+    assert (found.title, found.subtitle) == (
+        "Delete 2 blocks · 2:40",
+        "every block of parser #lexer becomes untracked",
+    ), "says how much goes"
+    journal.apply(db, list(found.ops), found.title, NOW)
+    lines = [line for _, line in timeline(db)]
+    assert "parser #lexer" not in lines, "no parser left"
+    assert timeline(db)[-1] == ("14:05", ""), "the running one became a stop after review"
+    assert ("11:05", "") not in timeline(db), "after a stop it is removed, not doubled"
+
+
+def test_delete_a_whole_day_and_undo_it(db, sample, logged):
+    logged(9, 0, "yesterday's", day=NOW.date() - timedelta(days=1))
+    logged(10, 0, "", day=NOW.date() - timedelta(days=1))
+    before = timeline(db)
+    found = plan(db, "day:2026-10-20", "delete")
+    assert found.title == "Delete 6 blocks · 4:40", "everything that day"
+    journal.apply(db, list(found.ops), found.title, NOW)
+    assert store.blocks(store.transitions(db))[-1].line == "yesterday's", "only yesterday is left"
+    journal.undo(db)
+    assert timeline(db) == before, "and undo brings the day back"
+
+
+def test_delete_nothing(db, logged):
+    assert not plan(db, "day:2026-10-19", "delete").valid, "an empty day has nothing to delete"
 
 
 @pytest.mark.parametrize(
@@ -217,8 +246,8 @@ def test_edit_hints_when_nothing_is_typed(db, sample):
         "a block offers every edit, ⇥ fills it in"
     )
     rows = editrows.rows("task:parser #lexer", "", db, NOW, NO_OFFSET, ALIASED)
-    assert [r["autocomplete"] for r in rows if "autocomplete" in r] == ["#", ""], (
-        "a task: tags and rename"
+    assert [r["autocomplete"] for r in rows if "autocomplete" in r] == ["#", "delete", ""], (
+        "a task: tags, delete and rename"
     )
 
 
@@ -249,6 +278,14 @@ def test_a_blocks_edit_list_has_no_block_rows(db, sample):
 
 
 EDIT_REVIEW = {"action": "edit", "target": "task:review pr 212"}
+
+
+def test_cmd_opens_the_edit_list_with_delete_typed(db, sample):
+    row = present.rows("", db, NOW, NO_OFFSET)[0]
+    assert (row["mods"]["cmd"]["arg"], row["mods"]["cmd"]["variables"]) == (
+        "delete",
+        EDIT_REVIEW,
+    ), "⌘↩ then ↩ deletes, so a stray ⌘↩ alone removes nothing"
 
 
 @pytest.mark.parametrize("key", ["ctrl", "cmd"])

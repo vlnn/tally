@@ -185,7 +185,7 @@ def remember_command(args: list[str], ctx: Context) -> int:
     if chosen is None or chosen.problem or chosen.at is None:
         raise Usage("remember needs a time first, then the text")
     added = remind.add(ctx.db, chosen.at, chosen.text)
-    remind.schedule(added)
+    remind.schedule(added, ctx.now)
     bar.poke(ctx.env)
     return say(f"Reminder set for {remind.spoken(added.at, ctx.now)}: {added.text}")
 
@@ -270,7 +270,7 @@ def run(
     if not argv or argv[0] not in COMMANDS:
         print(USAGE, file=sys.stderr)
         return 2
-    ctx = Context(env, now or datetime.now().replace(second=0, microsecond=0), db)
+    ctx = Context(env, now or datetime.now().replace(microsecond=0), db)
     try:
         return COMMANDS[argv[0]](argv[1:], ctx)
     except Usage as error:

@@ -192,18 +192,43 @@ def delete_plan(spot: Around, now: datetime) -> Plan:
     return Plan(f"Delete {this.line}", f"{this.at:%H:%M}–{end} becomes untracked", (op,))
 
 
-HINTS = (
-    ("#tag", "#", "add a tag; -#tag removes one, both may be typed together"),
-    ("start 14:05", "start ", "move the start (a time or -10m)"),
-    ("end 14:40", "end ", "move the end"),
-    ("delete", "delete", "the block's time becomes untracked"),
-    ("anything else", "", "renames"),
-)
+def delete_all_plan(
+    db: sqlite3.Connection, chosen: list[store.Block], where: str, now: datetime
+) -> Plan:
+    """Every chosen block becomes untracked; a stop after a stop is removed, not written."""
+    if not chosen:
+        return refused("Nothing to delete", where)
+    gone = {b.id for b in chosen}
+    ops = []
+    stopped = True
+    for change in store.transitions(db):
+        if change.id not in gone:
+            stopped = change.stop
+            continue
+        ops.append(delete(change.id) if stopped else update(change.id, line=""))
+        stopped = True
+    total = sum((b.length(now) for b in chosen), timedelta())
+    return Plan(
+        f"Delete {counted(len(chosen))} · {hm(total)}",
+        f"{where} becomes untracked",
+        tuple(ops),
+    )
+
+
+TAG_HINT = ("#tag", "#", "add a tag; -#tag removes one, both may be typed together")
+START_HINT = ("start 14:05", "start ", "move the start (a time or -10m)")
+END_HINT = ("end 14:40", "end ", "move the end")
+DELETE_HINT = ("delete", "delete", "its time becomes untracked; t undo brings it back")
+RENAME_HINT = ("anything else", "", "renames")
+HINTS = {
+    BLOCK: (TAG_HINT, START_HINT, END_HINT, DELETE_HINT, RENAME_HINT),
+    TASK: (TAG_HINT, DELETE_HINT, RENAME_HINT),
+    DAY: (TAG_HINT, DELETE_HINT),
+}
 
 
 def hints(kind: str) -> list[Plan]:
-    usable = HINTS if kind == BLOCK else (HINTS[0], HINTS[-1])
-    return [Plan(title, subtitle, complete=complete) for title, complete, subtitle in usable]
+    return [Plan(title, subtitle, complete=complete) for title, complete, subtitle in HINTS[kind]]
 
 
 def block_plan(
@@ -243,7 +268,9 @@ def task_plan(db: sqlite3.Connection, line: str, text: str, now: datetime, scope
     change = tagging(text)
     if change:
         return tag_plan(chosen, change, where, scope)
-    if text.split()[0] in ("start", "end", "delete"):
+    if text.split() == ["delete"]:
+        return delete_all_plan(db, chosen, f"every block of {line}", now)
+    if text.split()[0] in ("start", "end"):
         return refused(
             f"{text.split()[0]} is for one block", "pick one from the list below the hints"
         )
@@ -261,10 +288,13 @@ def day_plan(
         for b in store.blocks(store.transitions(db, shown.since, shown.until))
         if shown.since <= b.start < shown.until
     ]
+    where = f"every block on {shown.day:%a %-d %b}"
+    if text.split() == ["delete"]:
+        return delete_all_plan(db, chosen, where, now)
     change = tagging(text)
     if not change:
-        return refused("A day takes tags only", "#tag adds to every block that day, -#tag removes")
-    return tag_plan(chosen, change, f"every block on {shown.day:%a %-d %b}", scope)
+        return refused("A day takes tags or delete", "#tag adds, -#tag removes, delete clears it")
+    return tag_plan(chosen, change, where, scope)
 
 
 def plan(

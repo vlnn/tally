@@ -21,8 +21,15 @@ from tally import cli, present, remind
         ("+2 h review", datetime(2026, 10, 20, 17, 0), "review"),
         ("+1 hour 30 min call", datetime(2026, 10, 20, 16, 30), "call"),
         ("+1h 30m call", datetime(2026, 10, 20, 16, 30), "call"),
+        ("+1h30 call", datetime(2026, 10, 20, 16, 30), "call"),
         ("+15 meeting notes", datetime(2026, 10, 20, 15, 15), "meeting notes"),
         ("+15 m", None, ""),
+        ("+30s tea", datetime(2026, 10, 20, 15, 0, 30), "tea"),
+        ("+30 sec tea", datetime(2026, 10, 20, 15, 0, 30), "tea"),
+        ("+30 seconds tea", datetime(2026, 10, 20, 15, 0, 30), "tea"),
+        ("+1m30s tea", datetime(2026, 10, 20, 15, 1, 30), "tea"),
+        ("+1 min 30 sec tea", datetime(2026, 10, 20, 15, 1, 30), "tea"),
+        ("+90s tea", datetime(2026, 10, 20, 15, 1, 30), "tea"),
         ("+1h stretch", datetime(2026, 10, 20, 16, 0), "stretch"),
         ("+1h30m call mum", datetime(2026, 10, 20, 16, 30), "call mum"),
         ("21:00 stand up", datetime(2026, 10, 20, 21, 0), "stand up"),
@@ -99,7 +106,7 @@ def test_a_reminder_row_is_alone(db, sample):
 
 
 def test_the_agent_fires_once_at_that_minute():
-    made = remind.agent(remind.Reminder(7, datetime(2026, 10, 20, 21, 0), "stand up"))
+    made = remind.agent(remind.Reminder(7, datetime(2026, 10, 20, 21, 0), "stand up"), NOW)
     assert made["Label"] == "com.anokhin.tally.remind.7", "one agent per reminder"
     assert made["StartCalendarInterval"] == {"Month": 10, "Day": 20, "Hour": 21, "Minute": 0}, (
         "launchd's calendar time, fired on wake if the Mac slept through it"
@@ -182,6 +189,37 @@ def test_cli_filter_end_to_end(run, agents):
     assert json.loads(out)["items"][0]["title"] == "Remind 21:00: go out", "t 9PM go out"
 
 
+def test_seconds_count_down_instead_of_a_calendar_minute():
+    made = remind.agent(remind.Reminder(8, datetime(2026, 10, 20, 15, 0, 30), "tea"), NOW)
+    assert made["StartInterval"] == 30 and "StartCalendarInterval" not in made, (
+        "launchd's calendar has no seconds, so a countdown from when it was set"
+    )
+
+
+def test_seconds_in_the_row(db):
+    row = present.rows("+30 sec tea", db, NOW, NO_OFFSET)[0]
+    assert (row["title"], row["subtitle"]) == (
+        "Remind 15:00:30: tea",
+        "in 30 s · in big letters then · ↩ sets it",
+    ), "seconds are said when they matter"
+
+
+def test_minutes_land_on_the_minute():
+    late = NOW.replace(second=40)
+    assert remind.wanted("+15m stop", late).at == datetime(2026, 10, 20, 15, 15), (
+        "without seconds a reminder keeps to the calendar minute"
+    )
+    assert remind.wanted("+15m 10s stop", late).at == datetime(2026, 10, 20, 15, 15, 50), (
+        "with seconds it is exact"
+    )
+
+
+def test_a_seconds_reminder_is_stored_with_its_seconds(run, db, agents):
+    run("act", "remember", "+30s tea")
+    assert remind.pending(db)[0].at == datetime(2026, 10, 20, 15, 0, 30), "kept to the second"
+
+
 def test_until():
+    assert remind.until(NOW + timedelta(seconds=45), NOW) == "in 45 s", "seconds"
     assert remind.until(NOW + timedelta(minutes=5), NOW) == "in 5 min", "short"
     assert remind.until(NOW + timedelta(hours=2, minutes=5), NOW) == "in 2:05", "long"

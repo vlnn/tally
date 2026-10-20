@@ -120,11 +120,13 @@ def edit_mod(target: str, subtitle: str) -> Mod:
 
 
 def edit_mods(target: str, what: str) -> dict[str, Mod]:
-    """⌃↩ edits; ⌘↩ does the same, in case Alfred keeps ⌃↩ for itself."""
-    return {
-        "ctrl": edit_mod(target, f"⌃↩ {what}, its time stays"),
-        "cmd": edit_mod(target, f"⌘↩ {what}, its time stays"),
+    """⌃↩ edits; ⌘↩ opens the same list with delete typed in, so one more ↩ removes it."""
+    removal: Mod = {
+        "arg": "delete",
+        "subtitle": "⌘↩ delete it: shows what goes, ↩ there removes it, t undo brings it back",
+        "variables": {"action": "edit", "target": target},
     }
+    return {"ctrl": edit_mod(target, f"⌃↩ {what}, its time stays"), "cmd": removal}
 
 
 def task_edit_mods(line: str) -> dict[str, Mod]:

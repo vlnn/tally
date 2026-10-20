@@ -86,8 +86,8 @@ marks it undone. A block is edited through its own transition and the next: its 
 turns the block's transition into a stop, or removes it when a stop is already before it. The
 edit list and `act apply` plan the same typed text with `edits.plan`, so the row and the act
 cannot disagree; the target travels as the `target` variable (`block:<id>`, `task:<line>`,
-`day:<date>`). Editing starts from ⌃↩ on any task row (and on Stop and the day rows), with
-⌘↩ as a twin because Alfred may keep ⌃↩ for fallback searches; a task's edit list lists its
+`day:<date>`). Editing starts from ⌃↩ on any task row (and on Stop and the day rows); ⌘↩
+opens the same list with `delete` as its argument, which Alfred types into the list; a task's edit list lists its
 newest blocks under the hints, which is the only way to a single block. There is no `edit`
 command word: it is too common in task names. Existing databases get the two new tables on the next connect.
 
@@ -102,7 +102,9 @@ launchd runs calendar jobs missed during sleep on wake. The agent runs `osascrip
 Large Type object (and SwiftBar's notify when the plugin is there), marks it shown, and boots
 the agent out and deletes its plist. Without a year in the calendar interval a stale agent
 would fire again a year later; firing and cancelling both remove it, which is why both go
-through `remind.unschedule`. The Large Type object's config keys are from memory; if Alfred
+through `remind.unschedule`. A reminder with seconds gets `StartInterval` (a countdown from
+when it was set) instead, since the calendar has no seconds; launchd misses an interval that
+falls in sleep, which is the price of the second. The Large Type object's config keys are from memory; if Alfred
 shows `{query}` literally, double-click the object and set its text to `{query}`.
 
 ## Deliberately not here

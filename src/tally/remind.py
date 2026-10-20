@@ -15,15 +15,15 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
-from tally import store
 from tally.nudge import BUNDLE_ID, domain, launchctl
 
 TRIGGER = "remind"
 PREFIX = "com.anokhin.tally.remind"
-IN = re.compile(
-    r"^\+\s*(?:(\d+)\s*(?:h|hr|hrs|hour|hours))?\s*(?:(\d+)\s*(?:m|min|mins|minute|minutes)?)?$",
-    re.IGNORECASE,
-)
+HOURS = r"(?:(\d+)\s*(?:hours|hour|hrs|hr|h))"
+MINUTES = r"(?:(\d+)\s*(?:minutes|minute|mins|min|m))"
+SECONDS = r"(?:(\d+)\s*(?:seconds|second|secs|sec|s))"
+IN = re.compile(rf"^\+\s*{HOURS}?\s*{MINUTES}?\s*{SECONDS}?$", re.IGNORECASE)
+BARE = re.compile(rf"^\+\s*{HOURS}?\s*(\d+)$", re.IGNORECASE)
 MOST_WORDS = 4
 CLOCK = re.compile(r"^(\d{1,2}):(\d{2})$")
 MERIDIEM = re.compile(r"^(\d{1,2})(?::(\d{2}))?(am|pm)$", re.IGNORECASE)
@@ -44,14 +44,29 @@ class Wanted(NamedTuple):
     problem: str = ""
 
 
-def after(phrase: str, now: datetime) -> datetime | None:
-    """`+15`, `+15m`, `+15 min`, `+1h30m`, `+1 hour 30 min`: that long from now."""
+def duration(phrase: str) -> tuple | None:
+    """Hours, minutes, seconds as typed; a bare number is minutes."""
     found = IN.match(phrase)
-    if not found:
+    if found:
+        return found.groups()
+    bare = BARE.match(phrase)
+    return (*bare.groups(), None) if bare else None
+
+
+def after(phrase: str, now: datetime) -> datetime | None:
+    """`+15`, `+15 min`, `+1h30m`, `+30s`, `+1 min 30 sec`: that long from now.
+
+    With seconds in it the moment is exact; without, it lands on the minute.
+    """
+    groups = duration(phrase)
+    if groups is None:
         return None
-    hours, minutes = (int(part) if part else 0 for part in found.groups())
-    span = timedelta(hours=hours, minutes=minutes)
-    return (now + span).replace(second=0, microsecond=0) if span else None
+    hours, minutes, seconds = (int(part) if part else 0 for part in groups)
+    span = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+    if not span:
+        return None
+    at = (now + span).replace(microsecond=0)
+    return at if groups[2] else at.replace(second=0)
 
 
 def relative(words: list[str], now: datetime) -> tuple[datetime, int] | None:
@@ -121,9 +136,13 @@ def add(db: sqlite3.Connection, at: datetime, text: str) -> Reminder:
     connect(db)
     with db:
         cursor = db.execute(
-            "insert into reminders (at, text) values (?, ?)", (store.stamp(at), text.strip())
+            "insert into reminders (at, text) values (?, ?)", (exact(at), text.strip())
         )
     return Reminder(cursor.lastrowid or 0, at, text.strip())
+
+
+def exact(at: datetime) -> str:
+    return at.replace(microsecond=0).isoformat(timespec="seconds")
 
 
 def pending(db: sqlite3.Connection) -> list[Reminder]:
@@ -157,30 +176,39 @@ def agent_path(identity: int) -> Path:
     return agent_folder() / f"{label(identity)}.plist"
 
 
-def agent(chosen: Reminder) -> dict:
-    script = (
-        'tell application id "com.runningwithcrayons.Alfred" to run trigger '
-        f'"{TRIGGER}" in workflow "{BUNDLE_ID}" with argument "{chosen.id}"'
-    )
+def when_to_run(chosen: Reminder, now: datetime) -> dict:
+    """A calendar minute, which launchd keeps across sleep; seconds need a countdown instead."""
+    if chosen.at.second:
+        return {"StartInterval": max(1, int((chosen.at - now).total_seconds()))}
     at = chosen.at
     return {
-        "Label": label(chosen.id),
-        "ProgramArguments": ["/usr/bin/osascript", "-e", script],
         "StartCalendarInterval": {
             "Month": at.month,
             "Day": at.day,
             "Hour": at.hour,
             "Minute": at.minute,
-        },
+        }
+    }
+
+
+def agent(chosen: Reminder, now: datetime) -> dict:
+    script = (
+        'tell application id "com.runningwithcrayons.Alfred" to run trigger '
+        f'"{TRIGGER}" in workflow "{BUNDLE_ID}" with argument "{chosen.id}"'
+    )
+    return {
+        "Label": label(chosen.id),
+        "ProgramArguments": ["/usr/bin/osascript", "-e", script],
+        **when_to_run(chosen, now),
         "ProcessType": "Interactive",
     }
 
 
-def schedule(chosen: Reminder) -> Path:
+def schedule(chosen: Reminder, now: datetime) -> Path:
     path = agent_path(chosen.id)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as handle:
-        plistlib.dump(agent(chosen), handle)
+        plistlib.dump(agent(chosen, now), handle)
     launchctl("bootstrap", domain(), str(path))
     return path
 
@@ -191,15 +219,19 @@ def unschedule(identity: int) -> None:
 
 
 def until(at: datetime, now: datetime) -> str:
-    minutes = max(0, int((at - now).total_seconds() // 60))
+    seconds = max(0, int((at - now).total_seconds()))
+    if seconds < 60:
+        return f"in {seconds} s"
+    minutes = seconds // 60
     if minutes < 60:
         return f"in {minutes} min"
     return f"in {minutes // 60}:{minutes % 60:02d}"
 
 
 def spoken(at: datetime, now: datetime) -> str:
+    clock = f"{at:%H:%M:%S}" if at.second else f"{at:%H:%M}"
     if at.date() == now.date():
-        return f"{at:%H:%M}"
+        return clock
     if at.date() == now.date() + timedelta(days=1):
-        return f"tomorrow {at:%H:%M}"
-    return f"{at:%a %-d %b} {at:%H:%M}"
+        return f"tomorrow {clock}"
+    return f"{at:%a %-d %b} {clock}"
