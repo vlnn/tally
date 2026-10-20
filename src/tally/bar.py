@@ -20,7 +20,6 @@ SCRIPT = """#!/bin/bash
 # <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
 # <swiftbar.hideLastUpdated>true</swiftbar.hideLastUpdated>
 # <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
-# <swiftbar.hideSwiftBar>true</swiftbar.hideSwiftBar>
 {exports}
 ALFRED=com.runningwithcrayons.Alfred
 cd "{bundle}" || exit 1

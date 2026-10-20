@@ -159,7 +159,8 @@ its plugin folder (read from SwiftBar's own settings, or from **SwiftBar plugins
 fails). The menu bar then shows the running task and its time, `parser #lexer 1:42`, or
 `tally` when nothing runs, refreshed every thirty seconds and the moment you start or stop
 anything from Alfred. Its menu is the bare `t` list: Stop, the recent tasks (click resumes),
-Today, Open Tally.
+Today, Open Tally, and at the bottom SwiftBar's own submenu for its preferences, refresh and
+quit.
 
 The plugin is one shell script that runs the workflow's own `tally bar`, so it needs nothing
 else; run `t bar` again after moving the workflow or changing a setting. To remove it, delete

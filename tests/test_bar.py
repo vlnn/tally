@@ -185,3 +185,9 @@ def test_the_filter_never_asks_for_swiftbar_unless_bar_is_typed(run, sample, moc
     for text in ("", "par", "mail 14:30", "@week"):
         run("filter", text)
     spawned.assert_not_called()
+
+
+def test_the_plugin_keeps_swiftbars_own_menu():
+    text = bar.script({})
+    assert "hideSwiftBar" not in text, "SwiftBar's submenu (preferences, refresh, quit) stays"
+    assert "<swiftbar.hideAbout>true</swiftbar.hideAbout>" in text, "the rest stays tidy"
