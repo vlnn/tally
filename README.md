@@ -160,6 +160,10 @@ are every past task matching by word prefix, newest start first, each ↩ resumi
 | ⌘C   | copy the line                                                                       |
 | ⌘L   | large type                                                                          |
 
+The task that is running is never restarted by picking it again: typed or found, its row reads
+`parser #lexer is running · 0:55 since 14:05` and ↩ leaves it running, so its time keeps
+counting from when it began. ⌥↩ on that row stops it and ⌃↩ edits it.
+
 Two tasks are the same task when their lines are the same after folding case, diacritics and
 spacing. `parser #lexer` and `parser` are two tasks. A `#tag` anywhere in the line groups the
 ribbon and nothing else.

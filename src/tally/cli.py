@@ -77,9 +77,21 @@ def start_command(args: list[str], ctx: Context) -> int:
     if not line:
         raise Usage("start needs a line")
     at = ctx.at()
+    active = store.running(ctx.db, ctx.now)
+    if at == ctx.now and active and everything(ctx).same(line, active.line):
+        return keep_command([line], ctx)
     store.record(ctx.db, at, line, ctx.now)
     bar.poke(ctx.env)
     return say(f"{line} from {at:%H:%M}")
+
+
+def keep_command(args: list[str], ctx: Context) -> int:
+    active = store.running(ctx.db, ctx.now)
+    if active is None:
+        return say("Nothing is running")
+    return say(
+        f"Still {active.line} · {present.hm(active.length(ctx.now))} since {active.start:%H:%M}"
+    )
 
 
 def stop_command(args: list[str], ctx: Context) -> int:
@@ -175,6 +187,7 @@ Command = Callable[[list[str], Context], int]
 
 ACTIONS: dict[str, Command] = {
     "start": start_command,
+    "keep": keep_command,
     "stop": stop_command,
     "bar": install_bar_command,
     "nudges": nudges_command,

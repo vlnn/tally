@@ -109,8 +109,8 @@ def test_typed_words_resume_a_known_task_as_it_was_spelled(db, sample):
 
 def test_typed_words_list_matching_tasks_below(db, sample):
     rows = present.rows("pa", db, NOW, NO_OFFSET)
-    assert titles(rows) == ["Start pa", "Resume parser #lexer"], (
-        "every task matching by word prefix is a resume target"
+    assert titles(rows) == ["Start pa", "parser #lexer is running"], (
+        "every task matching by word prefix is listed, the running one as running"
     )
     assert "Resume mail" not in titles(present.rows("pa", db, NOW, NO_OFFSET)), (
         "tasks that do not match are not listed"
@@ -119,6 +119,7 @@ def test_typed_words_list_matching_tasks_below(db, sample):
 
 def test_typed_words_reach_old_tasks(db, logged):
     logged(9, 0, "ancient", day=NOW.date() - timedelta(days=30))
+    logged(10, 0, "", day=NOW.date() - timedelta(days=30))
     assert titles(present.rows("anc", db, NOW, NO_OFFSET)) == ["Start anc", "Resume ancient"], (
         "typing searches all history"
     )

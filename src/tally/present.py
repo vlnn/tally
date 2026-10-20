@@ -107,11 +107,7 @@ def stop_mod(db: sqlite3.Connection, now: datetime) -> Mod:
     active = store.running(db, now)
     if active is None:
         return {"valid": False, "subtitle": "⌥↩ nothing to stop"}
-    return {
-        "arg": "",
-        "subtitle": f"⌥↩ stop {active.line} · {hm(active.length(now))}",
-        "variables": {"action": "stop"},
-    }
+    return stop_mod_for(active, now)
 
 
 def task_mods(db: sqlite3.Connection, now: datetime, fill: bool = True) -> dict[str, Mod]:
@@ -315,6 +311,30 @@ def known_spelling(found: list[store.Task], line: str, scope: Scope) -> str | No
     return next((task.line for task in found if scope.same(task.line, line)), None)
 
 
+def running_row(active: store.Block, now: datetime) -> Row:
+    """The task that runs, found by typing: ↩ leaves it running instead of restarting it."""
+    return {
+        "title": f"{active.line} is running",
+        "subtitle": f"{hm(active.length(now))} since {active.start:%H:%M} · ↩ keeps it running",
+        "arg": active.line,
+        "variables": {"action": "keep"},
+        "text": {"copy": active.line, "largetype": active.line},
+        "mods": {**NO_MODS, "alt": stop_mod_for(active, now), **task_edit_mods(active.line)},
+    }
+
+
+def stop_mod_for(active: store.Block, now: datetime) -> Mod:
+    return {
+        "arg": "",
+        "subtitle": f"⌥↩ stop {active.line} · {hm(active.length(now))}",
+        "variables": {"action": "stop"},
+    }
+
+
+def is_running(line: str, active: store.Block | None, scope: Scope) -> bool:
+    return active is not None and scope.same(line, active.line)
+
+
 def typed_rows(
     text: str, db: sqlite3.Connection, now: datetime, starts: timedelta, scope: Scope = EVERYTHING
 ) -> list[Row]:
@@ -324,10 +344,17 @@ def typed_rows(
     typed = typed._replace(line=scope.apply(typed.line))
     day = Day(db, now, starts)
     found = store.tasks(db, datetime.min, now)
-    top = start_row(typed, known_spelling(found, typed.line, scope), db, now)
+    active = store.running(db, now)
+    if typed.at is None and is_running(typed.line, active, scope):
+        assert active is not None
+        top = running_row(active, now)
+    else:
+        top = start_row(typed, known_spelling(found, typed.line, scope), db, now)
     wanted = timewords.parse(text, now).line
     similar = [
-        resume_row(task, day, db, now)
+        running_row(active, now)
+        if active and is_running(task.line, active, scope)
+        else resume_row(task, day, db, now)
         for task in found
         if scope.holds(task.line)
         and matches(wanted, task.line)
