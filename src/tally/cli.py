@@ -11,7 +11,7 @@ from typing import Callable
 
 from hoard.alfred import data_folder
 
-from tally import days, present, store, view
+from tally import bar, days, present, store, view
 
 NAME = "tally"
 DB_NAME = "tally.db"
@@ -58,7 +58,8 @@ def say(text: str) -> int:
 
 def filter_command(args: list[str], ctx: Context) -> int:
     text = args[0] if args else ""
-    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts))
+    plugin = lambda: bar.plugin_path(ctx.env)  # noqa: E731
+    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts, plugin))
 
 
 def start_command(args: list[str], ctx: Context) -> int:
@@ -67,6 +68,7 @@ def start_command(args: list[str], ctx: Context) -> int:
         raise Usage("start needs a line")
     at = ctx.at()
     store.record(ctx.db, at, line, ctx.now)
+    bar.poke(ctx.env)
     return say(f"{line} from {at:%H:%M}")
 
 
@@ -75,7 +77,20 @@ def stop_command(args: list[str], ctx: Context) -> int:
     if active is None:
         return say("Nothing was running")
     store.record(ctx.db, ctx.now, "", ctx.now)
+    bar.poke(ctx.env)
     return say(f"{active.line} · {present.hm(active.length(ctx.now))}")
+
+
+def bar_command(args: list[str], ctx: Context) -> int:
+    plugin = args[0] if args else bar.PLUGIN
+    return say(bar.menu(ctx.db, ctx.now, ctx.starts, plugin))
+
+
+def install_bar_command(args: list[str], ctx: Context) -> int:
+    try:
+        return say(f"SwiftBar plugin installed · {bar.install(ctx.env)}")
+    except FileNotFoundError as missing:
+        return say(f"Not installed: {missing} not found")
 
 
 def act_command(args: list[str], ctx: Context) -> int:
@@ -98,7 +113,11 @@ def today_command(args: list[str], ctx: Context) -> int:
 
 Command = Callable[[list[str], Context], int]
 
-ACTIONS: dict[str, Command] = {"start": start_command, "stop": stop_command}
+ACTIONS: dict[str, Command] = {
+    "start": start_command,
+    "stop": stop_command,
+    "bar": install_bar_command,
+}
 
 COMMANDS: dict[str, Command] = {
     "filter": filter_command,
@@ -106,6 +125,7 @@ COMMANDS: dict[str, Command] = {
     "act": act_command,
     "view": view_command,
     "today": today_command,
+    "bar": bar_command,
 }
 
 USAGE = "usage: tally " + "|".join(COMMANDS) + " ..."

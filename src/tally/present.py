@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import TypedDict
 
 from hoard.alfred import matches
@@ -162,6 +164,24 @@ def view_row(
     }
 
 
+def bar_row(installed: Path | None) -> Row:
+    if installed is None:
+        return {
+            "title": "SwiftBar not found",
+            "subtitle": "brew install swiftbar, or set its plugin folder in the workflow settings",
+            "valid": False,
+            "mods": NO_MODS,
+        }
+    verb = "Reinstall" if installed.exists() else "Install"
+    return {
+        "title": f"{verb} the SwiftBar plugin",
+        "subtitle": f"{installed} · the running task in the menu bar, recent ones in its menu",
+        "arg": "",
+        "variables": {"action": "bar"},
+        "mods": NO_MODS,
+    }
+
+
 def recent(db: sqlite3.Connection, now: datetime) -> list[store.Task]:
     active = store.running(db, now)
     found = store.tasks(db, now - timedelta(days=RECENT_DAYS), now)
@@ -193,8 +213,16 @@ def typed_rows(text: str, db: sqlite3.Connection, now: datetime, starts: timedel
     return [top, *similar]
 
 
-def rows(text: str, db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[Row]:
+def rows(
+    text: str,
+    db: sqlite3.Connection,
+    now: datetime,
+    starts: timedelta,
+    plugin: Callable[[], Path | None] = lambda: None,
+) -> list[Row]:
     words = text.split()
+    if words == ["bar"]:
+        return [bar_row(plugin())]
     if len(words) == 1 and days.is_rule(words[0]):
         shown = days.asked(words[0], now, starts)
         return [view_row(shown, db, now, starts, words[0])] if shown else []

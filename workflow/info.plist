@@ -323,7 +323,8 @@ t             the previous task first (↩ resumes it), the other recent ones, S
 t parser      Start or Resume parser; matching tasks below
 t parser 14:05  start at 14:05 (or -20m, -1h20m); the row says what it ends or cuts
 ⇧↩            start where the last block ended, filling the gap
-t @today      the day as a ribbon, with totals (@yesterday, 2026-10-19)
+t @today      the day as a ribbon, with totals (@yesterday, @week, @month, 2026-10-19)
+t bar         install the SwiftBar plugin: the running task in the menu bar
 </string>
 	<key>uidata</key>
 	<dict>
@@ -379,6 +380,27 @@ t @today      the day as a ribbon, with totals (@yesterday, 2026-10-19)
 	</dict>
 	<key>userconfigurationconfig</key>
 	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>read from SwiftBar's own settings</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>SwiftBar's plugin folder, only if the workflow cannot read it from SwiftBar itself. Type t bar to install the plugin.</string>
+			<key>label</key>
+			<string>SwiftBar plugins</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>swiftbar_plugins</string>
+		</dict>
 		<dict>
 			<key>config</key>
 			<dict>

@@ -8,7 +8,14 @@ from tally import cli, present
 
 WORKFLOW = Path(__file__).parent.parent / "workflow"
 SOURCE = Path(__file__).parent.parent / "src" / "tally"
-ROUTED = {"alfred_workflow_data", "alfred_workflow_cache", "action", "at"}
+ROUTED = {
+    "alfred_workflow_data",
+    "alfred_workflow_cache",
+    "alfred_preferences",
+    "alfred_workflow_uid",
+    "action",
+    "at",
+}
 
 
 @pytest.fixture(scope="module")
@@ -36,7 +43,7 @@ def test_every_script_calls_a_known_command(objects):
 
 
 def test_every_action_the_rows_emit_is_routed(objects):
-    emitted = {"start", "stop", "view"}
+    emitted = {"start", "stop", "view", "bar"}
     branches = {
         cond["matchstring"]
         for obj in objects.values()

@@ -15,6 +15,7 @@ t mail 14:30             Resume mail               from 14:30 · ends parser #le
 t coffee -20m            Start coffee              from 14:40 · ends parser #lexer at 14:40
 t @today                 Today                     4:40 logged · ↩ shows the day
 t @week                  This week                 17:15 logged · ↩ shows the week
+t bar                    Install the SwiftBar plugin   the running task in the menu bar
 ```
 
 A block is the time between one transition and the next. The database holds transitions only
@@ -118,6 +119,18 @@ Tue 20  ·············▒▒▓▓░░░░███████�
 ```
 
 Untracked time is counted inside each day, never across nights. A week runs Monday to Sunday.
+
+## The menu bar
+
+With [SwiftBar](https://github.com/swiftbar/SwiftBar) installed, `t bar` ↩ writes a plugin into
+its plugin folder (read from SwiftBar's own settings, or from **SwiftBar plugins** if that
+fails). The menu bar then shows the running task and its time, `parser #lexer 1:42`, or
+`tally` when nothing runs, refreshed every thirty seconds and the moment you start or stop
+anything from Alfred. Its menu is the bare `t` list: Stop, the recent tasks (click resumes),
+Today, Open Tally.
+
+The plugin is one shell script that runs the workflow's own `tally bar`, so it needs nothing
+else; run `t bar` again after moving the workflow or changing a setting.
 
 ## From a terminal
 

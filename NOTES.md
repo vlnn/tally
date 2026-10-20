@@ -13,6 +13,7 @@ data folder) and nothing of the kernel.
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
+| `bar`       | the SwiftBar plugin: status line, menu, where it goes, the poke after a change | the menu gets a line |
 | `cli`       | subcommands, settings, the database path                              | a new subcommand, a new setting       |
 
 The canvas is `workflow/info.plist`: hotkey → script filter `t` → a conditional on `action`
@@ -21,6 +22,14 @@ action's one line. The Text View runs the `view` script at the bundle root and �
 text. A new action is a `variables.action` value in `present` and an entry in `cli.ACTIONS`; the
 plist changes only when the action needs an Alfred object. `tests/test_workflow.py` cross-checks
 the plist against the package, so a mismatch fails before Alfred sees it.
+
+The menu bar is SwiftBar's, not ours: `bar.install` writes `tally.30s.sh` into SwiftBar's plugin
+folder with the bundle path and the settings baked in, and that script either prints the menu
+(`tally bar`) or acts (`start`, `stop`, `open`) when SwiftBar calls it with arguments, so every
+click is one process and no state lives outside the database. `start` and `stop` from Alfred
+poke SwiftBar through its URL scheme when the plugin exists. A status item of our own (forty
+lines of Swift compiled into the data folder, as `hoard.alfred.apple` does) is the no-dependency
+version; `bar.status` would be its one call.
 
 Rows are a `TypedDict` like wisp's rather than hoard's `Item`, because they carry `action` and
 `at` and `Item` carries one `verb`.
