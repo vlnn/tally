@@ -206,3 +206,12 @@ def test_a_range_word_offers_the_range(db, sample):
         "4:40 logged · ↩ shows the week",
         "@week",
     ), "the week's tally and its view"
+
+
+def test_a_leading_span_backfills(db, sample):
+    row = present.rows("-10m get scrubber from courier", db, NOW, NO_OFFSET)[0]
+    assert (row["title"], row["arg"], row["variables"]) == (
+        "Start get scrubber from courier",
+        "get scrubber from courier",
+        {"action": "start", "at": "2026-10-20T14:50"},
+    ), "-10m first means it started ten minutes ago, not a task called -10m"

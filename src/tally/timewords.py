@@ -1,13 +1,14 @@
-"""The last word of a line may say when the block started."""
+"""A time at either end of a line says when the block started: `-10m mail`, `mail 14:05`."""
 
 from __future__ import annotations
 
 import re
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from typing import NamedTuple
 
+from tally import durations
+
 CLOCK = re.compile(r"^(\d{1,2}):(\d{2})$")
-AGO = re.compile(r"^-(?:(\d+)h)?(?:(\d+)m)?$")
 
 
 class Typed(NamedTuple):
@@ -24,25 +25,40 @@ def clock(word: str, now: datetime) -> datetime | None:
 
 
 def ago(word: str, now: datetime) -> datetime | None:
-    found = AGO.match(word)
-    if not found or word == "-":
-        return None
-    hours, minutes = (int(part) if part else 0 for part in found.groups())
-    return now - timedelta(hours=hours, minutes=minutes)
+    found = durations.parse(word, "-", bare=False)
+    return now - found.length if found else None
 
 
 def moment(word: str, now: datetime) -> datetime | None:
     return clock(word, now) or ago(word, now)
 
 
+def started(words: list[str], now: datetime) -> tuple[datetime, list[str]] | None:
+    """When the block started and the words left: a span first, or a clock or span last."""
+    first = durations.leading(words, "-")
+    if first:
+        return now - first.length, words[first.taken :]
+    at = clock(words[-1], now) if len(words) > 1 else None
+    if at:
+        return at, words[:-1]
+    last = durations.trailing(words, "-")
+    if last:
+        return now - last.length, words[: -last.taken]
+    return None
+
+
 def parse(text: str, now: datetime) -> Typed:
     words = text.split()
     if not words:
         return Typed("", None)
-    at = moment(words[-1], now)
-    if at is None:
+    found = started(words, now)
+    if found is None:
+        alone = moment(words[0], now) if len(words) == 1 else None
+        if alone:
+            return Typed("", alone, "Type what you were doing before the time")
         return Typed(" ".join(words), None)
-    line = " ".join(words[:-1])
+    at, rest = found
+    line = " ".join(rest)
     if not line:
         return Typed("", at, "Type what you were doing before the time")
     if at > now:

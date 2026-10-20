@@ -18,6 +18,17 @@ from tally import timewords
         ("call at 14:00 with ola", "call at 14:00 with ola", None),
         ("pr 212", "pr 212", None),
         ("fix -5", "fix -5", None),
+        (
+            "-10m get scrubber from courier",
+            "get scrubber from courier",
+            datetime(2026, 10, 20, 14, 50),
+        ),
+        ("-10 min get scrubber", "get scrubber", datetime(2026, 10, 20, 14, 50)),
+        ("-10 get scrubber", "get scrubber", datetime(2026, 10, 20, 14, 50)),
+        ("-1h30m strata", "strata", datetime(2026, 10, 20, 13, 30)),
+        ("strata -10 min", "strata", datetime(2026, 10, 20, 14, 50)),
+        ("strata -1 hour 30 min", "strata", datetime(2026, 10, 20, 13, 30)),
+        ("-2m download script #w", "download script #w", datetime(2026, 10, 20, 14, 58)),
         ("parser 25:00", "parser 25:00", None),
     ],
 )

@@ -200,14 +200,20 @@ The task that is running is never restarted by picking it again: typed or found,
 `parser #lexer is running · 0:55 since 14:05` and ↩ leaves it running, so its time keeps
 counting from when it began. ⌥↩ on that row stops it and ⌃↩ edits it.
 
+A start that changes nothing is not kept: the same task again right after itself (one block,
+not two), switches undone within the same minute (no 0:00 blocks), a stop after a stop. Any
+start, stop or edit tidies these away, older ones included.
+
 Two tasks are the same task when their lines are the same after folding case, diacritics and
 spacing. `parser #lexer` and `parser` are two tasks. A `#tag` anywhere in the line groups the
 ribbon and nothing else.
 
 ## Backfill
 
-The last word of what you type may be a time: `14:05`, `9:30`, `-20m`, `-1h`, `-1h20m`. The
-block starts then instead of now, and the row's subtitle says what that does before you press ↩:
+A span back in time may come first or last: `-10m mail`, `-10 min mail`, `-10 mail`, `mail -20m`,
+`mail -1 hour 20 min`; a clock time comes last: `mail 14:05` (first, a clock time is a reminder).
+The block starts then instead of now, and the row's subtitle says what that does before you
+press ↩:
 
 - later than the running task started: `from 14:30 · ends parser at 14:30`
 - earlier than it started: `11:30–14:05, before parser (which keeps running) · cuts call at 11:30`,

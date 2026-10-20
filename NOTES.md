@@ -9,6 +9,7 @@ data folder) and nothing of the kernel.
 | ----------- | --------------------------------------------------------------------- | ------------------------------------- |
 | `store`     | the table of transitions; blocks, running, tasks, spelling            | a transition gets a column, a new read |
 | `days`      | when a day starts, which day a moment is, the `@today`/`@week` words  | a new rule word                       |
+| `durations` | spans as typed (`+15`, `-10 min`, `+1h30m`, `+30s`), first or last words | a new unit |
 | `timewords` | the last word of a line as a time                                     | a new way to say when                 |
 | `commands`  | words that name a command (stop, today, week, bar…) and their prefixes | a new command word                   |
 | `tags`      | tags in a line, aliases from the setting, time under each tag          | a tag gets a meaning beyond grouping  |
@@ -106,6 +107,14 @@ through `remind.unschedule`. A reminder with seconds gets `StartInterval` (a cou
 when it was set) instead, since the calendar has no seconds; launchd misses an interval that
 falls in sleep, which is the price of the second. The Large Type object's config keys are from memory; if Alfred
 shows `{query}` literally, double-click the object and set its text to `{query}`.
+
+## Redundant transitions
+
+`store.redundant` is the one rule for what changes nothing: of transitions sharing a minute
+only the last counts, a transition repeating the task before it (or a stop after a stop, or a
+stop before anything) is dropped. `store.record` deletes them after each insert; `journal.apply`
+deletes them inside its batch, so undo brings them back with the rest. Old data is tidied by
+the next write, whatever it is.
 
 ## Deliberately not here
 

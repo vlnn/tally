@@ -86,8 +86,27 @@ def record(db: sqlite3.Connection, at: datetime, line: str, now: datetime) -> Tr
         "insert into transitions (at, line, logged_at) values (?, ?, ?)",
         (stamp(at), tidy(line), stamp(now)),
     )
+    for identity in redundant(transitions(db)):
+        db.execute("delete from transitions where id = ?", (identity,))
     db.commit()
     return Transition(cursor.lastrowid or 0, at, tidy(line), now)
+
+
+def redundant(changes: list[Transition]) -> list[int]:
+    """Transitions that change nothing: one replaced within the same minute, the same task
+    again right after itself, a stop after a stop or before anything."""
+    lasting = [
+        c for c, after in zip(changes, [*changes[1:], None]) if not after or after.at != c.at
+    ]
+    gone = [c.id for c in changes if c not in lasting]
+    before: Transition | None = None
+    for change in lasting:
+        repeated = before is not None and same_task(before.line, change.line)
+        if repeated or (before is None and change.stop):
+            gone.append(change.id)
+        else:
+            before = change
+    return gone
 
 
 def read(row: tuple) -> Transition:

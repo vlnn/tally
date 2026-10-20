@@ -65,6 +65,8 @@ def apply(db: sqlite3.Connection, ops: list[Op], said: str, now: datetime) -> in
         assert batch is not None
         for op in ops:
             carry_out(db, op, batch, now)
+        for identity in store.redundant(store.transitions(db)):
+            carry_out(db, delete(identity), batch, now)
     return batch
 
 

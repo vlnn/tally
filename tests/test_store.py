@@ -62,6 +62,7 @@ def test_tasks_are_distinct_and_newest_first(db, sample):
 
 def test_tasks_fold_spelling(db, logged):
     logged(9, 0, "Parser")
+    logged(9, 30, "")
     logged(10, 0, "parser")
     found = store.tasks(db, NOW - timedelta(days=1), NOW)
     assert [t.line for t in found] == ["parser"], "case does not make a second task"
@@ -95,3 +96,56 @@ def test_backfill_is_visible(db, logged):
 def test_record_rounds_to_the_minute(db):
     store.record(db, datetime(2026, 10, 20, 9, 0, 42), "mail", NOW)
     assert store.transitions(db)[0].at == datetime(2026, 10, 20, 9, 0), "seconds are dropped"
+
+
+def timeline(db):
+    return [(f"{t.at:%H:%M}", t.line) for t in store.transitions(db)]
+
+
+def test_the_same_task_right_after_itself_is_one_block(db, logged):
+    logged(17, 53, "swiftbar setup")
+    logged(19, 28, "swiftbar setup")
+    assert timeline(db) == [("17:53", "swiftbar setup")], "17:53–now, not two blocks"
+
+
+def test_switching_within_a_minute_leaves_no_zero_blocks(db, logged):
+    logged(19, 28, "swiftbar setup")
+    logged(20, 5, "zx-pk")
+    logged(20, 5, "swiftbar setup")
+    logged(20, 5, "zx-pk")
+    assert timeline(db) == [("19:28", "swiftbar setup"), ("20:05", "zx-pk")], (
+        "only the last switch in a minute counts"
+    )
+
+
+def test_a_stop_after_a_stop_is_dropped(db, logged):
+    logged(9, 0, "mail")
+    logged(9, 30, "")
+    logged(9, 45, "")
+    assert timeline(db) == [("09:00", "mail"), ("09:30", "")], "the second stop changed nothing"
+
+
+def test_a_gap_keeps_repeats_apart(db, logged):
+    logged(13, 31, "#talk to @JC")
+    logged(13, 32, "")
+    logged(13, 33, "#talk to @JC")
+    assert len(store.blocks(store.transitions(db))) == 2, "with a gap between, two blocks"
+
+
+def test_redundant_finds_the_lot_in_old_data(db):
+    rows = [
+        (17, 53, "swiftbar setup"),
+        (19, 28, "swiftbar setup"),
+        (20, 5, "zx-pk"),
+        (20, 5, "swiftbar setup"),
+        (20, 5, "zx-pk"),
+    ]
+    for hour, minute, line in rows:
+        at = datetime(2026, 10, 20, hour, minute)
+        db.execute(
+            "insert into transitions (at, line, logged_at) values (?, ?, ?)",
+            (store.stamp(at), line, store.stamp(at)),
+        )
+    assert store.redundant(store.transitions(db)) == [3, 4, 2], (
+        "two zero-minute switches and the repeated start"
+    )

@@ -15,16 +15,11 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
+from tally import durations
 from tally.nudge import BUNDLE_ID, domain, launchctl
 
 TRIGGER = "remind"
 PREFIX = "com.anokhin.tally.remind"
-HOURS = r"(?:(\d+)\s*(?:hours|hour|hrs|hr|h))"
-MINUTES = r"(?:(\d+)\s*(?:minutes|minute|mins|min|m))"
-SECONDS = r"(?:(\d+)\s*(?:seconds|second|secs|sec|s))"
-IN = re.compile(rf"^\+\s*{HOURS}?\s*{MINUTES}?\s*{SECONDS}?$", re.IGNORECASE)
-BARE = re.compile(rf"^\+\s*{HOURS}?\s*(\d+)$", re.IGNORECASE)
-MOST_WORDS = 4
 CLOCK = re.compile(r"^(\d{1,2}):(\d{2})$")
 MERIDIEM = re.compile(r"^(\d{1,2})(?::(\d{2}))?(am|pm)$", re.IGNORECASE)
 
@@ -44,38 +39,16 @@ class Wanted(NamedTuple):
     problem: str = ""
 
 
-def duration(phrase: str) -> tuple | None:
-    """Hours, minutes, seconds as typed; a bare number is minutes."""
-    found = IN.match(phrase)
-    if found:
-        return found.groups()
-    bare = BARE.match(phrase)
-    return (*bare.groups(), None) if bare else None
-
-
-def after(phrase: str, now: datetime) -> datetime | None:
-    """`+15`, `+15 min`, `+1h30m`, `+30s`, `+1 min 30 sec`: that long from now.
+def relative(words: list[str], now: datetime) -> tuple[datetime, int] | None:
+    """`+15`, `+15 min`, `+1h30m`, `+30s`: that long from now, and how many words it took.
 
     With seconds in it the moment is exact; without, it lands on the minute.
     """
-    groups = duration(phrase)
-    if groups is None:
+    found = durations.leading(words, "+")
+    if found is None:
         return None
-    hours, minutes, seconds = (int(part) if part else 0 for part in groups)
-    span = timedelta(hours=hours, minutes=minutes, seconds=seconds)
-    if not span:
-        return None
-    at = (now + span).replace(microsecond=0)
-    return at if groups[2] else at.replace(second=0)
-
-
-def relative(words: list[str], now: datetime) -> tuple[datetime, int] | None:
-    """The longest run of leading words that reads as a duration, and how many it took."""
-    for taken in range(min(MOST_WORDS, len(words)), 0, -1):
-        at = after(" ".join(words[:taken]), now)
-        if at:
-            return at, taken
-    return None
+    at = (now + found.length).replace(microsecond=0)
+    return (at if found.seconds else at.replace(second=0)), found.taken
 
 
 def clock(hour: int, minute: int) -> time | None:
