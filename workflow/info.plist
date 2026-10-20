@@ -492,6 +492,27 @@ The second hotkey stops the running task without opening Alfred: give it a key.
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<string>w=work</string>
+				<key>placeholder</key>
+				<string>w=work, l=lexer</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Short tags and what they stand for, separated by commas: with w=work, #w counts as #work in every view. Applied when reading, so changing it changes history too.</string>
+			<key>label</key>
+			<string>Tag aliases</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>tag_aliases</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<string></string>
 				<key>placeholder</key>
 				<string>read from SwiftBar's own settings</string>

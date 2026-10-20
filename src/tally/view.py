@@ -10,8 +10,10 @@ RERUN = 60.0
 FOOTER = "↩ copies the text"
 
 
-def showing(db, word: str, now: datetime, starts: timedelta) -> dict:
-    found = ribbon.shown(db, word or "@today", now, starts)
+def showing(
+    db, word: str, now: datetime, starts: timedelta, aliases: dict[str, str] | None = None
+) -> dict:
+    found = ribbon.shown(db, word or "@today", now, starts, aliases)
     if found is None:
         return {"response": f"**{word} is not a day**: try @today, @yesterday or 2026-10-20"}
     window, text = found

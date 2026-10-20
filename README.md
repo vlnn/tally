@@ -49,9 +49,11 @@ nothing stored can disagree with anything else.
    double-click it.
 2. Optional: **Database folder**, if you want `tally.db` somewhere you can see. Empty means
    Alfred's data folder for the workflow, which survives updates.
-3. Optional: **Day starts at**. With `04:00`, work at one in the morning belongs to the evening
+3. Optional: **Tag aliases**, `w=work` by default: short tags and what they stand for, so
+   `#w` counts as `#work`. Add more with commas, `w=work, l=lexer`.
+4. Optional: **Day starts at**. With `04:00`, work at one in the morning belongs to the evening
    before. Every tally is recomputed from this, so changing it changes history too.
-4. The hotkey objects are wired for HYPER+T (⌃⌥⇧⌘T) to open `t` and nothing yet to stop.
+5. The hotkey objects are wired for HYPER+T (⌃⌥⇧⌘T) to open `t` and nothing yet to stop.
    Alfred clears hotkeys on import, so double-click each once and press the combination you
    want.
 
@@ -132,6 +134,27 @@ go by rank of the day's totals, so the biggest group is always `█`. `░` is t
 that nothing claims, `▶` is now, and `▚` marks a block logged more than ten minutes after it
 started. Today's view refreshes every minute. ↩ copies the text.
 
+### By tag
+
+When any block that day has a tag, the view adds the time under each tag, a block counting
+fully for every tag it carries (so the sum can be more than the day), and the untagged time
+last:
+
+```
+by tag
+
+#work       4:10
+#lexer      2:40
+#team       0:35
+untagged    0:30
+```
+
+Short tags from **Tag aliases** are spelled out before anything is counted: with `w=work`,
+`mail #w`, `review #W` and `parser #work` are all `#work`, on the ribbon, in the totals and in
+this table. The block list keeps the lines as you typed them. Aliases are applied when reading,
+so adding one regroups history too. They do not make `parser #w` and `parser #work` one task
+for resuming; that is still the line as written.
+
 ## The week and the month
 
 `t @week`, `t @lastweek`, `t @month` or `t @lastmonth` open the same view with one line per day
@@ -151,6 +174,7 @@ Tue 20  ·············▒▒▓▓░░░░███████�
 ```
 
 Untracked time is counted inside each day, never across nights. A week runs Monday to Sunday.
+The by-tag table follows the totals, over the whole range.
 
 ## The menu bar (optional, needs SwiftBar)
 

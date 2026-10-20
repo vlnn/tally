@@ -13,7 +13,7 @@ from tally import present, store
 PLUGIN = "tally.30s.sh"
 IDLE = "tally"
 WIDTH = 18
-PASSED = ("alfred_workflow_data", "db_path", "day_starts")
+PASSED = ("alfred_workflow_data", "db_path", "day_starts", "tag_aliases")
 
 SCRIPT = """#!/bin/bash
 # <swiftbar.hideAbout>true</swiftbar.hideAbout>

@@ -11,6 +11,7 @@ data folder) and nothing of the kernel.
 | `days`      | when a day starts, which day a moment is, the `@today`/`@week` words  | a new rule word                       |
 | `timewords` | the last word of a line as a time                                     | a new way to say when                 |
 | `commands`  | words that name a command (stop, today, week, bar…) and their prefixes | a new command word                   |
+| `tags`      | tags in a line, aliases from the setting, time under each tag          | a tag gets a meaning beyond grouping  |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |

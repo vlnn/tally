@@ -11,7 +11,7 @@ from typing import Callable
 
 from hoard.alfred import data_folder
 
-from tally import bar, days, present, store, view
+from tally import bar, days, present, store, tags, view
 
 NAME = "tally"
 DB_NAME = "tally.db"
@@ -26,6 +26,7 @@ class Context:
         self.env = env
         self.now = now
         self.starts = days.offset(env.get("day_starts", ""))
+        self.aliases = tags.aliases(env.get("tag_aliases", tags.DEFAULT_ALIASES))
         self._db = db
 
     @property
@@ -101,13 +102,15 @@ def act_command(args: list[str], ctx: Context) -> int:
 
 def view_command(args: list[str], ctx: Context) -> int:
     word = (args[0] if args else "").strip()
-    print(json.dumps(view.showing(ctx.db, word, ctx.now, ctx.starts), ensure_ascii=False))
+    print(
+        json.dumps(view.showing(ctx.db, word, ctx.now, ctx.starts, ctx.aliases), ensure_ascii=False)
+    )
     return 0
 
 
 def today_command(args: list[str], ctx: Context) -> int:
     word = (args[0] if args else "").strip() or "@today"
-    shown = view.showing(ctx.db, word, ctx.now, ctx.starts)
+    shown = view.showing(ctx.db, word, ctx.now, ctx.starts, ctx.aliases)
     return say(shown["response"])
 
 
