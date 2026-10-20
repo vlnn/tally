@@ -162,3 +162,15 @@ def test_the_edit_list_is_reached_from_the_conditional(plist, objects):
     assert [objects[s]["type"] for s in sources] == ["alfred.workflow.utility.conditional"], (
         "only the action conditional opens it"
     )
+
+
+def test_a_clicked_nudge_has_a_url_trigger_into_t(plist, objects):
+    triggers = {
+        o["config"]["triggerid"]: u
+        for u, o in objects.items()
+        if o["type"] == "alfred.workflow.trigger.external"
+    }
+    opened = objects[triggers["open"]]
+    assert opened["config"]["availableviaurlhandler"] is True, "reachable as alfred://runtrigger"
+    target = objects[plist["connections"][triggers["open"]][0]["destinationuid"]]
+    assert target["config"]["keyword"] == "t", "and it opens t with the argument typed in"

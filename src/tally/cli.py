@@ -117,9 +117,13 @@ def install_bar_command(args: list[str], ctx: Context) -> int:
 
 def nudge_command(args: list[str], ctx: Context) -> int:
     said = nudge.message(ctx.db, ctx.now, nudge.settings(ctx.env), nudge.user_idle())
-    if said:
-        bar.poke(ctx.env)
-        print(said)
+    if not said:
+        return 0
+    if bar.installed(ctx.env):
+        bar.refresh()
+        bar.notify(f"{said} {nudge.CLICK}", nudge.opening(ctx.db, ctx.now))
+        return 0
+    print(said)
     return 0
 
 

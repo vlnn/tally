@@ -170,3 +170,60 @@ def test_t_nudge_offers_the_toggle(db, sample):
     ), "two letters reach it"
     rows = present.rows("nudge", db, NOW, timedelta(), nudges=lambda: (True, "every 15 min"))
     assert rows[0]["title"] == "Turn nudges off", "and it says which way it goes"
+
+
+def test_a_click_opens_t_with_the_running_task_typed_in(db, sample):
+    assert nudge.opening(db, NOW) == (
+        "alfred://runtrigger/com.anokhin.tally/open/?argument=parser%20%23lexer"
+    ), "so its row, with ⌥↩ to stop, is on top"
+
+
+def test_a_click_on_a_gap_opens_the_bare_list(db, logged):
+    logged(9, 0, "mail")
+    logged(13, 40, "")
+    assert nudge.opening(db, NOW).endswith("/open/?argument="), "the previous task is first there"
+
+
+def test_the_swiftbar_url_wraps_the_link_once_more():
+    from urllib.parse import parse_qs, urlsplit
+
+    from tally import bar
+
+    href = "alfred://runtrigger/com.anokhin.tally/open/?argument=parser%20%23lexer"
+    url = bar.notification("Still on parser? Click to switch.", href)
+    fields = {k: v[0] for k, v in parse_qs(urlsplit(url).query).items()}
+    assert url.startswith("swiftbar://notify?") and fields == {
+        "plugin": "tally",
+        "title": "Tally",
+        "body": "Still on parser? Click to switch.",
+        "href": href,
+    }, "SwiftBar decodes one layer and gets Alfred's link back intact"
+
+
+def test_with_the_plugin_installed_the_nudge_goes_through_swiftbar(run, sample, mocker):
+    mocker.patch.object(nudge, "user_idle", return_value=AT_DESK)
+    mocker.patch("tally.bar.installed", return_value=True)
+    mocker.patch("tally.bar.refresh")
+    notify = mocker.patch("tally.bar.notify")
+    _code, out = run("nudge")
+    assert out == "", "nothing printed, so Alfred posts no second notification"
+    notify.assert_called_once_with(
+        "Still on parser #lexer · 0:55? Ignore to keep it. Click to switch.",
+        "alfred://runtrigger/com.anokhin.tally/open/?argument=parser%20%23lexer",
+    )
+
+
+def test_without_the_plugin_alfred_posts_it(run, sample, mocker):
+    mocker.patch.object(nudge, "user_idle", return_value=AT_DESK)
+    mocker.patch("tally.bar.installed", return_value=False)
+    notify = mocker.patch("tally.bar.notify")
+    _code, out = run("nudge")
+    assert out.strip().startswith("Still on parser") and not notify.called, "Alfred's, unclickable"
+
+
+def test_notify_opens_the_url_quietly(mocker):
+    from tally import bar
+
+    opened = mocker.patch("subprocess.run")
+    bar.notify("hi", "alfred://x")
+    assert opened.call_args.args[0][:2] == ["open", "-g"], "in the background"

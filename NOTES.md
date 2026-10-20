@@ -67,8 +67,12 @@ notification object. Going through Alfred rather than running the bundle from la
 the settings in one place and survives the bundle moving on reinstall. Ignoring a nudge writes
 nothing: confirmation is the absence of a switch. Quiet when the last transition is younger than
 the interval, when `ioreg`'s `HIDIdleTime` is longer than it, outside the hours, and at weekends
-unless asked. A clickable nudge (click opens `t`) needs SwiftBar's notify URL or a helper app;
-Alfred's notifications do nothing on click.
+unless asked. With the SwiftBar plugin installed, `tally nudge` prints nothing and posts through
+`swiftbar://notify` instead, with `href` set to `alfred://runtrigger/com.anokhin.tally/open/`
+and the running task as the argument; the `open` external trigger (URL handler on) feeds `t`.
+The href is one more layer of URL encoding inside the notify URL, so SwiftBar's decoding
+hands Alfred its own link intact. Alfred's notifications do nothing on click, which is why
+they stay the fallback only.
 
 ## Editing
 

@@ -120,10 +120,31 @@ def refresh() -> None:
         pass
 
 
+def installed(env: Mapping[str, str]) -> bool:
+    path = plugin_path(env)
+    return bool(path and path.exists())
+
+
+def notification(body: str, href: str) -> str:
+    from urllib.parse import quote, urlencode
+
+    fields = {"plugin": "tally", "title": "Tally", "body": body, "href": href}
+    return "swiftbar://notify?" + urlencode(fields, quote_via=quote)
+
+
+def notify(body: str, href: str) -> None:
+    """A notification from SwiftBar, which opens href when clicked."""
+    import subprocess
+
+    try:
+        subprocess.run(["open", "-g", notification(body, href)], capture_output=True, check=False)
+    except FileNotFoundError:
+        pass
+
+
 def poke(env: Mapping[str, str]) -> None:
     """Refresh the menu bar after a change from Alfred, if the plugin is installed."""
-    path = plugin_path(env)
-    if path and path.exists():
+    if installed(env):
         refresh()
 
 

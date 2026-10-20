@@ -91,6 +91,12 @@ Nothing running since 13:40. Ignore if you're away.
 Nothing logged today. Type t to start.
 ```
 
+With the SwiftBar plugin installed (`t bar`), nudges come from SwiftBar and are clickable: a
+click opens `t` with the running task typed in, so its row is on top with ⌥↩ to stop it, and
+for a gap it opens the bare list with the previous task first. SwiftBar asks once for
+permission to post notifications. Without the plugin, nudges come from Alfred and a click does
+nothing.
+
 Ignoring a nudge is the confirmation: nothing is written, the task keeps running or the gap
 stays a gap. Anything else is a switch, done the usual way in `t`. A nudge is skipped when you
 switched less than an interval ago, when the Mac has had no key press or mouse move for an
