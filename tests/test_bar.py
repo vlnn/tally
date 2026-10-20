@@ -92,7 +92,9 @@ def test_install_writes_the_plugin_and_refreshes(tmp_path, mocker):
     assert path == tmp_path / "plugins" / "tally.30s.sh" and path.stat().st_mode & 0o111, (
         "written where SwiftBar looks, executable"
     )
-    run.assert_called_once_with(["open", "-g", "swiftbar://refreshplugin?name=tally"], check=False)
+    run.assert_called_once_with(
+        ["open", "-g", "swiftbar://refreshplugin?name=tally"], capture_output=True, check=False
+    )
 
 
 def test_bar_row_offers_install_or_reinstall(tmp_path):
@@ -144,4 +146,42 @@ def test_start_pokes_swiftbar_only_when_the_plugin_is_installed(run, tmp_path, m
     run_.assert_not_called()
     (tmp_path / "tally.30s.sh").write_text("")
     run("act", "stop", swiftbar_plugins=str(tmp_path))
-    run_.assert_called_once_with(["open", "-g", "swiftbar://refreshplugin?name=tally"], check=False)
+    run_.assert_called_once_with(
+        ["open", "-g", "swiftbar://refreshplugin?name=tally"], capture_output=True, check=False
+    )
+
+
+def test_start_and_stop_work_without_swiftbar(run, db, mocker):
+    defaults = mocker.patch("subprocess.run")
+    defaults.return_value.returncode = 1
+    defaults.return_value.stdout = ""
+    _code, started = run("act", "start", "mail")
+    _code, stopped = run("act", "stop")
+    assert (started.strip(), stopped.strip()) == ("mail from 15:00", "mail · 0:00"), (
+        "without SwiftBar the actions print exactly what they print with it"
+    )
+    assert [call.args[0][0] for call in defaults.call_args_list] == ["defaults", "defaults"], (
+        "they only ask whether SwiftBar is there, and never try to refresh it"
+    )
+
+
+def test_start_works_where_there_is_no_macos(run, db, mocker):
+    mocker.patch("subprocess.run", side_effect=FileNotFoundError("defaults"))
+    _code, out = run("act", "start", "mail")
+    assert out.strip() == "mail from 15:00", "no defaults, no open: still a start"
+
+
+def test_a_stale_plugin_with_swiftbar_gone_refreshes_quietly(run, tmp_path, mocker):
+    (tmp_path / "tally.30s.sh").write_text("")
+    opened = mocker.patch("subprocess.run")
+    opened.return_value.returncode = 1
+    _code, out = run("act", "start", "mail", swiftbar_plugins=str(tmp_path))
+    assert out.strip() == "mail from 15:00", "a failed refresh adds nothing to the notification"
+    assert opened.call_args.kwargs["capture_output"] is True, "open's complaint is swallowed"
+
+
+def test_the_filter_never_asks_for_swiftbar_unless_bar_is_typed(run, sample, mocker):
+    spawned = mocker.patch("subprocess.run")
+    for text in ("", "par", "mail 14:30", "@week"):
+        run("filter", text)
+    spawned.assert_not_called()

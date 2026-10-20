@@ -33,8 +33,17 @@ nothing stored can disagree with anything else.
 4. The hotkey object is wired for HYPER+T (⌃⌥⇧⌘T). Alfred clears hotkeys on import, so
    double-click it once and press the combination you want.
 
-Nothing to install: the bundle runs on macOS's own `/usr/bin/python3` (3.9+) with the standard
-library only.
+## Requirements
+
+| Needs                                         | For                                         |
+| --------------------------------------------- | ------------------------------------------- |
+| [Alfred 5](https://www.alfredapp.com) with the Powerpack | everything: workflows need the Powerpack |
+| macOS's own `/usr/bin/python3` (3.9+)         | everything; it comes with the Command Line Tools, nothing else is installed |
+| [SwiftBar](https://github.com/swiftbar/SwiftBar), optional (`brew install swiftbar`) | the running task in the menu bar, `t bar` |
+
+SwiftBar is the only optional piece, and nothing else depends on it. Without it, `t`, backfill,
+stop and the views work the same; `t bar` says SwiftBar was not found instead of installing, and
+starting or stopping a task never tries to reach it.
 
 ## The list
 
@@ -120,7 +129,7 @@ Tue 20  ·············▒▒▓▓░░░░███████�
 
 Untracked time is counted inside each day, never across nights. A week runs Monday to Sunday.
 
-## The menu bar
+## The menu bar (optional, needs SwiftBar)
 
 With [SwiftBar](https://github.com/swiftbar/SwiftBar) installed, `t bar` ↩ writes a plugin into
 its plugin folder (read from SwiftBar's own settings, or from **SwiftBar plugins** if that
@@ -130,7 +139,8 @@ anything from Alfred. Its menu is the bare `t` list: Stop, the recent tasks (cli
 Today, Open Tally.
 
 The plugin is one shell script that runs the workflow's own `tally bar`, so it needs nothing
-else; run `t bar` again after moving the workflow or changing a setting.
+else; run `t bar` again after moving the workflow or changing a setting. To remove it, delete
+`tally.30s.sh` from SwiftBar's plugin folder, or quit SwiftBar: tally does not notice either.
 
 ## From a terminal
 

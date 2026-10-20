@@ -113,7 +113,12 @@ def plugin_path(env: Mapping[str, str]) -> Path | None:
 def refresh() -> None:
     import subprocess
 
-    subprocess.run(["open", "-g", "swiftbar://refreshplugin?name=tally"], check=False)
+    try:
+        subprocess.run(
+            ["open", "-g", "swiftbar://refreshplugin?name=tally"], capture_output=True, check=False
+        )
+    except FileNotFoundError:
+        pass
 
 
 def poke(env: Mapping[str, str]) -> None:
