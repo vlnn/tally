@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -28,7 +29,8 @@ def main(archive):
         with zipfile.ZipFile(archive) as packed:
             packed.extractall(bundle)
         data = str(Path(scratch) / "data")
-        assert " from " in run(bundle, data, "act", "start", "parser #lexer")
+        earlier = (datetime.now() - timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M")
+        assert " from " in run(bundle, data, "act", "start", "parser #lexer", at=earlier)
         rows = json.loads(run(bundle, data, "filter", ""))["items"]
         assert [r["title"] for r in rows][-2:] == ["Stop", "Today"], rows
         assert "parser #lexer" in run(bundle, data, "act", "stop")
