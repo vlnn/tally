@@ -80,6 +80,28 @@ Three ways, fastest first:
   long before you press it.
 - **`t st` ↩.** Typing a command word puts it on top (see below).
 
+## Reminders
+
+A time as the **first** word makes a reminder instead of a task:
+
+```
+t +15m stop the work      Remind 15:15: stop the work      in 15 min · in big letters then
+t 21:00 stand up          Remind 21:00: stand up           in 6:00
+t 9PM go out              Remind 21:00: go out
+t 9:00 standup            Remind tomorrow 09:00: standup   (9:00 has passed today)
+```
+
+`+15m`, `+1h`, `+1h30m` count from now; `21:00`, `9pm`, `9:30PM` are today, or tomorrow when
+already past. At that minute Alfred shows the text in Large Type across the screen; with the
+SwiftBar plugin a clickable notification stays behind too. If the Mac sleeps through it, it
+shows on wake. Pending reminders are listed in bare `t` (`⏰ 21:00 stand up · in 6:00`), and ↩
+on one cancels it.
+
+A time **last** is still a backfill (`t standup 9:30`), so a time in the future there says to put
+it first. Underneath, each reminder is a row in the database and a one-shot launchd agent
+(`~/Library/LaunchAgents/com.anokhin.tally.remind.<id>.plist`) that asks Alfred to run the
+workflow's `remind` trigger; it removes itself when it fires or is cancelled.
+
 ## Nudges
 
 `t nudge` ↩ turns them on: every 15 minutes between 09:00 and 19:00 on weekdays, a

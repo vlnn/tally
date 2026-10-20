@@ -31,7 +31,7 @@ def test_only_the_last_word_may_be_a_time(text, line, at):
 @pytest.mark.parametrize(
     "text, problem",
     [
-        ("parser 16:30", "16:30 has not happened yet"),
+        ("parser 16:30", "16:30 has not happened yet; for a reminder, put the time first"),
         ("14:30", "Type what you were doing before the time"),
         ("-20m", "Type what you were doing before the time"),
     ],

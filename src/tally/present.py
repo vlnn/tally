@@ -10,7 +10,7 @@ from typing import TypedDict
 
 from hoard.alfred import matches
 
-from tally import commands, days, journal, store, timewords
+from tally import commands, days, journal, remind, store, timewords
 from tally.scope import Scope
 
 EVERYTHING = Scope()
@@ -285,6 +285,28 @@ def undo_row(db: sqlite3.Connection) -> Row:
     }
 
 
+def reminder_row(text: str, chosen: remind.Wanted, now: datetime) -> Row:
+    if chosen.problem or chosen.at is None:
+        return {"title": chosen.problem, "subtitle": "", "valid": False, "mods": NO_MODS}
+    return {
+        "title": f"Remind {remind.spoken(chosen.at, now)}: {chosen.text}",
+        "subtitle": f"{remind.until(chosen.at, now)} · in big letters then · ↩ sets it",
+        "arg": text,
+        "variables": {"action": "remember"},
+        "mods": NO_MODS,
+    }
+
+
+def pending_row(chosen: remind.Reminder, now: datetime) -> Row:
+    return {
+        "title": f"⏰ {remind.spoken(chosen.at, now)} {chosen.text}",
+        "subtitle": f"{remind.until(chosen.at, now)} · ↩ cancels it",
+        "arg": str(chosen.id),
+        "variables": {"action": "forget"},
+        "mods": NO_MODS,
+    }
+
+
 def recent(db: sqlite3.Connection, now: datetime, scope: Scope = EVERYTHING) -> list[store.Task]:
     active = store.running(db, now)
     found = store.tasks(db, now - timedelta(days=RECENT_DAYS), now)
@@ -304,6 +326,7 @@ def bare_rows(
     active = store.running(db, now)
     if active:
         shown.append(stop_row(active, now))
+    shown += [pending_row(r, now) for r in remind.pending(db)]
     return [*shown, view_row(day.window, db, now, starts, "@today", scope)]
 
 
@@ -404,6 +427,9 @@ def rows(
         return bare_rows(db, now, starts, scope)
     if len(words) == 1 and days.DATE.match(words[0]):
         return date_rows(words[0], db, now, starts)
+    later = remind.wanted(text, now)
+    if later:
+        return [reminder_row(text, later, now)]
     found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]
     if text.lstrip().startswith("@"):
         return found or [unknown_day_row(words[0])]

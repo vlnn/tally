@@ -17,6 +17,7 @@ data folder) and nothing of the kernel.
 | `journal`   | edits as batches of ops on transitions, each batch's before-image, undo | a new kind of op |
 | `edits`     | what text typed in the edit list means for a block, a task or a day; refusals | a new edit word |
 | `editrows`  | the edit list's rows: hints, the planned change, the refusal | the edit list shows something new |
+| `remind`    | reading a reminder's time, the reminders table, one launchd agent per reminder | a repeating reminder |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
@@ -89,6 +90,20 @@ cannot disagree; the target travels as the `target` variable (`block:<id>`, `tas
 ⌘↩ as a twin because Alfred may keep ⌃↩ for fallback searches; a task's edit list lists its
 newest blocks under the hints, which is the only way to a single block. There is no `edit`
 command word: it is too common in task names. Existing databases get the two new tables on the next connect.
+
+## Reminders
+
+A first word that is a time to come (`+15m`, `21:00`, `9pm`) makes the list a single reminder
+row; a last word that is a time is a backfill, as before, so the two never compete. `act
+remember` re-reads the typed text, stores a row in `reminders` (created on first use) and
+writes a launchd agent with `StartCalendarInterval` at that month, day, hour and minute;
+launchd runs calendar jobs missed during sleep on wake. The agent runs `osascript` to fire the
+`remind` external trigger with the id, the workflow's `tally remind` prints the text into the
+Large Type object (and SwiftBar's notify when the plugin is there), marks it shown, and boots
+the agent out and deletes its plist. Without a year in the calendar interval a stale agent
+would fire again a year later; firing and cancelling both remove it, which is why both go
+through `remind.unschedule`. The Large Type object's config keys are from memory; if Alfred
+shows `{query}` literally, double-click the object and set its text to `{query}`.
 
 ## Deliberately not here
 

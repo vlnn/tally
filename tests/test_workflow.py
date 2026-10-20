@@ -44,7 +44,19 @@ def test_every_script_calls_a_known_command(objects):
 
 
 def test_every_action_the_rows_emit_is_routed(objects):
-    emitted = {"start", "keep", "stop", "view", "bar", "nudges", "edit", "apply", "undo"}
+    emitted = {
+        "start",
+        "keep",
+        "stop",
+        "view",
+        "bar",
+        "nudges",
+        "edit",
+        "apply",
+        "undo",
+        "remember",
+        "forget",
+    }
     branches = {
         cond["matchstring"]
         for obj in objects.values()
@@ -174,3 +186,15 @@ def test_a_clicked_nudge_has_a_url_trigger_into_t(plist, objects):
     assert opened["config"]["availableviaurlhandler"] is True, "reachable as alfred://runtrigger"
     target = objects[plist["connections"][triggers["open"]][0]["destinationuid"]]
     assert target["config"]["keyword"] == "t", "and it opens t with the argument typed in"
+
+
+def test_a_reminder_fires_into_large_type(plist, objects):
+    triggers = {
+        o["config"]["triggerid"]: u
+        for u, o in objects.items()
+        if o["type"] == "alfred.workflow.trigger.external"
+    }
+    run = objects[plist["connections"][triggers["remind"]][0]["destinationuid"]]
+    assert "-m tally remind" in run["config"]["script"], "the trigger runs tally remind"
+    shown = objects[plist["connections"][run["uid"]][0]["destinationuid"]]
+    assert shown["type"] == "alfred.workflow.output.largetype", "which prints into Large Type"

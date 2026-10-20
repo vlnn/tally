@@ -46,5 +46,7 @@ def parse(text: str, now: datetime) -> Typed:
     if not line:
         return Typed("", at, "Type what you were doing before the time")
     if at > now:
-        return Typed(line, at, f"{at:%H:%M} has not happened yet")
+        return Typed(
+            line, at, f"{at:%H:%M} has not happened yet; for a reminder, put the time first"
+        )
     return Typed(line, at.replace(second=0, microsecond=0))

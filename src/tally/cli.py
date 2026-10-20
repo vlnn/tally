@@ -11,7 +11,20 @@ from typing import Callable
 
 from hoard.alfred import data_folder
 
-from tally import bar, days, editrows, edits, journal, nudge, present, scope, store, tags, view
+from tally import (
+    bar,
+    days,
+    editrows,
+    edits,
+    journal,
+    nudge,
+    present,
+    remind,
+    scope,
+    store,
+    tags,
+    view,
+)
 
 NAME = "tally"
 DB_NAME = "tally.db"
@@ -167,6 +180,37 @@ def undo_command(args: list[str], ctx: Context) -> int:
     return say(f"Undone: {batch.said}")
 
 
+def remember_command(args: list[str], ctx: Context) -> int:
+    chosen = remind.wanted(" ".join(args), ctx.now)
+    if chosen is None or chosen.problem or chosen.at is None:
+        raise Usage("remember needs a time first, then the text")
+    added = remind.add(ctx.db, chosen.at, chosen.text)
+    remind.schedule(added)
+    bar.poke(ctx.env)
+    return say(f"Reminder set for {remind.spoken(added.at, ctx.now)}: {added.text}")
+
+
+def forget_command(args: list[str], ctx: Context) -> int:
+    found = remind.find(ctx.db, int(args[0])) if args and args[0].isdigit() else None
+    if found is None:
+        return say("No such reminder")
+    remind.unschedule(found.id)
+    remind.settle(ctx.db, found.id, "cancelled")
+    return say(f"Cancelled: {found.text}")
+
+
+def remind_command(args: list[str], ctx: Context) -> int:
+    """Runs when a reminder's agent fires: its text for Large Type, and it is done."""
+    found = remind.find(ctx.db, int(args[0])) if args and args[0].strip().isdigit() else None
+    if found is None:
+        return 0
+    remind.unschedule(found.id)
+    remind.settle(ctx.db, found.id, "shown")
+    if bar.installed(ctx.env):
+        bar.notify(found.text, nudge.opening(ctx.db, ctx.now))
+    return say(found.text)
+
+
 def act_command(args: list[str], ctx: Context) -> int:
     if not args or args[0] not in ACTIONS:
         raise Usage(f"act needs one of {', '.join(ACTIONS)}")
@@ -197,6 +241,8 @@ ACTIONS: dict[str, Command] = {
     "nudges": nudges_command,
     "apply": apply_command,
     "undo": undo_command,
+    "remember": remember_command,
+    "forget": forget_command,
 }
 
 COMMANDS: dict[str, Command] = {
@@ -209,6 +255,7 @@ COMMANDS: dict[str, Command] = {
     "bar": bar_command,
     "nudge": nudge_command,
     "edit": edit_command,
+    "remind": remind_command,
 }
 
 USAGE = "usage: tally " + "|".join(COMMANDS) + " ..."
