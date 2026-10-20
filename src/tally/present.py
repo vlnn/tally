@@ -37,7 +37,9 @@ class Row(TypedDict, total=False):
     autocomplete: str
 
 
-NO_MODS: dict[str, Mod] = {mod: {"valid": False, "subtitle": ""} for mod in ("shift", "alt", "cmd")}
+NO_MODS: dict[str, Mod] = {
+    mod: {"valid": False, "subtitle": ""} for mod in ("shift", "alt", "cmd", "ctrl")
+}
 
 
 def hm(span: timedelta) -> str:
@@ -121,6 +123,18 @@ def edit_mod(target: str, subtitle: str) -> Mod:
     return {"arg": "", "subtitle": subtitle, "variables": {"action": "edit", "target": target}}
 
 
+def edit_mods(target: str, what: str) -> dict[str, Mod]:
+    """⌃↩ edits; ⌘↩ does the same, in case Alfred keeps ⌃↩ for itself."""
+    return {
+        "ctrl": edit_mod(target, f"⌃↩ {what}, its time stays"),
+        "cmd": edit_mod(target, f"⌘↩ {what}, its time stays"),
+    }
+
+
+def task_edit_mods(line: str) -> dict[str, Mod]:
+    return edit_mods(f"task:{line}", "rename or retag this task")
+
+
 def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime) -> Row:
     return {
         "title": f"Resume {task.line}",
@@ -128,10 +142,7 @@ def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime
         "arg": task.line,
         "variables": start_variables(None),
         "text": {"copy": task.line, "largetype": task.line},
-        "mods": {
-            **task_mods(db, now),
-            "cmd": edit_mod(f"task:{task.line}", "⌘↩ tag or rename every block of this task"),
-        },
+        "mods": {**task_mods(db, now), **task_edit_mods(task.line)},
     }
 
 
@@ -152,6 +163,8 @@ def start_row(
     verb = "Resume" if known else "Start"
     subtitle = effect(typed.at, db, now) if typed.at else "↩ from now"
     mods = task_mods(db, now, fill=typed.at is None)
+    if known:
+        mods = {**mods, **task_edit_mods(known)}
     return {
         "title": f"{verb} {line}",
         "subtitle": subtitle,
@@ -172,7 +185,7 @@ def stop_row(active: store.Block, now: datetime) -> Row:
         "subtitle": f"{active.line} · {hm(active.length(now))} since {active.start:%H:%M}",
         "arg": "",
         "variables": {"action": "stop"},
-        "mods": NO_MODS,
+        "mods": {**NO_MODS, **task_edit_mods(active.line)},
     }
 
 
@@ -210,7 +223,7 @@ def view_row(
     mods = NO_MODS
     if shown.length == 1:
         target = f"day:{shown.day.isoformat()}"
-        mods = {**NO_MODS, "cmd": edit_mod(target, "⌘↩ tag every block of the day")}
+        mods = {**NO_MODS, **edit_mods(target, "tag every block of the day")}
     return {
         "title": name.capitalize(),
         "subtitle": f"{hm(logged)} logged{part} · ↩ shows the {what}",
@@ -248,42 +261,13 @@ def nudge_row(on: bool, described: str) -> Row:
     }
 
 
-EDITABLE_DAYS = 7
-EDITABLE_LIMIT = 40
-
-
 def block_row(block: store.Block, now: datetime) -> Row:
-    target = f"block:{block.id}"
+    end = f"{block.end:%H:%M}" if block.end else "now"
     return {
-        "title": block.line,
-        "subtitle": f"{when(block.start, now)}–{f'{block.end:%H:%M}' if block.end else 'now'}"
-        f" · {hm(block.length(now))} · ↩ edit, tag, retime or delete",
+        "title": f"{when(block.start, now)}–{end} · {hm(block.length(now))}",
+        "subtitle": f"{block.line} · ↩ this block only: retime, tag, rename or delete",
         "arg": "",
-        "variables": {"action": "edit", "target": target},
-        "mods": NO_MODS,
-    }
-
-
-def block_rows(words: list[str], db: sqlite3.Connection, now: datetime, scope: Scope) -> list[Row]:
-    since = now - timedelta(days=EDITABLE_DAYS)
-    wanted = " ".join(words)
-    found = [
-        b
-        for b in store.blocks(store.transitions(db, None, now + timedelta(minutes=1)))
-        if (b.end or now) > since and scope.holds(b.line) and matches(wanted, b.line)
-    ]
-    chosen = list(reversed(found))[:EDITABLE_LIMIT]
-    if not chosen:
-        return [{"title": "No blocks to edit", "subtitle": "in the last week", "valid": False}]
-    return [block_row(b, now) for b in chosen]
-
-
-def edit_hint_row() -> Row:
-    return {
-        "title": "Edit a block",
-        "subtitle": "the last week's blocks, newest first; type words after edit to narrow",
-        "valid": False,
-        "autocomplete": "edit ",
+        "variables": {"action": "edit", "target": f"block:{block.id}"},
         "mods": NO_MODS,
     }
 
@@ -293,7 +277,7 @@ def undo_row(db: sqlite3.Connection) -> Row:
     if batch is None:
         return {
             "title": "Nothing to undo",
-            "subtitle": "edits made in t edit can be undone",
+            "subtitle": "edits made with ⌃↩ can be undone",
             "valid": False,
         }
     return {
@@ -362,8 +346,6 @@ def command_row(
 ) -> Row:
     if command.kind == "nudge":
         return nudge_row(*nudges())
-    if command.kind == "edit":
-        return edit_hint_row()
     if command.kind == "undo":
         return undo_row(db)
     if command.kind == "stop":
@@ -393,8 +375,6 @@ def rows(
     words = text.split()
     if not words:
         return bare_rows(db, now, starts, scope)
-    if words[0].lower() == "edit":
-        return block_rows(words[1:], db, now, scope)
     if len(words) == 1 and days.DATE.match(words[0]):
         return date_rows(words[0], db, now, starts)
     found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]

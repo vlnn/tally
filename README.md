@@ -35,30 +35,35 @@ set it to `job` and HYPER+[ is about `#job`.
 
 ## Editing and tagging afterwards
 
-`t edit` lists the last week's blocks, newest first; words after it narrow the list
-(`t edit parser`). ↩ on a block opens its edit list, where what you type is the edit and the
-row says exactly what it will do before you press ↩:
+Find the task the usual way, by typing in `t` or `tw` or among the recent ones, and press
+**⌃↩** on it instead of ↩: its edit list opens and its time is left alone. **⌃↩ on Stop**
+edits the running task. What you type there is the edit, and the row says what it will do
+before you press ↩:
 
 ```
-#w                Add #w · 1 block                        parser #lexer · 11:05
-#w -#lexer        Add #w, remove #lexer · 1 block
-start 11:30       Start parser at 11:30 instead of 11:05  untracked before it
-start 10:30       Start parser at 10:30 instead of 11:05  takes from untracked time
-end 13:30         End call at 13:30 instead of 13:40      untracked 13:30–13:40, then review
-end 13:50         End call at 13:50 instead of 13:40      review now starts at 13:50
-delete            Delete review                           13:40–14:05 becomes untracked
-lexing #lexer     Rename 1 block to lexing #lexer
+#w                Add #w · 2 blocks                every block of parser #lexer · 2 blocks, 2:40
+#w -#lexer        Add #w, remove #lexer · 2 blocks
+lexing #lexer     Rename 2 blocks to lexing #lexer
 ```
 
-With nothing typed, the list shows these as hints; ⇥ fills one in. An edit that cannot be done
-(a start before the previous block, an end past the next one, a time that has not happened)
-is one row saying why.
+Below the hints, the task's newest blocks are listed (`14:05–now · 0:55`). ↩ on one opens that
+block's own edit list, which also moves its time or deletes it:
 
-For many blocks at once:
+```
+#w                Add #w · 1 block                 parser #lexer · 11:05
+start 11:30       Start parser at 11:30 instead of 11:05   untracked before it
+start 10:30       Start parser at 10:30 instead of 11:05   takes from untracked time
+end 13:30         End call at 13:30 instead of 13:40       untracked 13:30–13:40, then review
+end 13:50         End call at 13:50 instead of 13:40       review now starts at 13:50
+delete            Delete review                    13:40–14:05 becomes untracked
+lexing            Rename 1 block to lexing
+```
 
-- **⌘↩ on a task row** (in `t` or `tw`) edits every block of that task: `#w` tags all of them,
-  a new name renames all of them.
-- **⌘↩ on the Today row** (or Yesterday, or a date) tags every block that day: `#w`, `-#w`.
+With nothing typed, these show as hints; ⇥ fills one in. An edit that cannot be done (a start
+before the previous block, an end past the next one, a time that has not happened) is one row
+saying why. **⌃↩ on the Today row** (or Yesterday, or a date) tags every block that day.
+
+⌘↩ does everything ⌃↩ does, in case your Alfred keeps ⌃↩ for its own fallback searches.
 
 **`t undo`** shows the last edit and ↩ takes it back; again for the one before. Tags follow
 **Tag aliases**, so adding `#w` to `parser #work` changes nothing, and `-#work` removes `#w`.
@@ -102,7 +107,7 @@ say yes.
 
 The first two letters of a command's name put its row above everything else, so `t st`,
 `t to`, `t yes`, `t we`, `t la` and `t mo` reach Stop, Today, Yesterday, This week, Last week
-and Last month, `t ba` the SwiftBar plugin, `t nu` the nudges, `t ed` editing and `t un` undo. The Start row for what you typed and the
+and Last month, `t ba` the SwiftBar plugin, `t nu` the nudges and `t un` undo. The Start row for what you typed and the
 matching tasks stay below, so typing on to `t standup` still finds it. With a leading `@`
 (`@today`, `@week`) only the views are listed.
 

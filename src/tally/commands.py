@@ -25,7 +25,6 @@ COMMANDS = (
     Command(("last month", "lastmonth"), "view", "@lastmonth"),
     Command(("bar", "swiftbar"), "bar"),
     Command(("nudge", "nudges"), "nudge"),
-    Command(("edit",), "edit"),
     Command(("undo",), "undo"),
 )
 

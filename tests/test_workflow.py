@@ -116,8 +116,8 @@ def test_alt_return_from_the_filter_reaches_act(plist, objects):
     ]
     for uid in filters:
         modifiers = {link["modifiers"] for link in plist["connections"][uid]}
-        assert modifiers == {0, 131072, 524288, 1048576}, (
-            "↩, ⇧↩, ⌥↩ and ⌘↩ pass through from both lists"
+        assert modifiers == {0, 131072, 524288, 1048576, 262144}, (
+            "↩, ⇧↩, ⌥↩, ⌘↩ and ⌃↩ pass through from both lists"
         )
 
 
@@ -142,7 +142,7 @@ def test_configured_variables_are_the_ones_the_package_reads(plist):
 
 
 def test_rows_never_emit_a_modifier_the_canvas_does_not_route():
-    assert set(present.NO_MODS) == {"shift", "alt", "cmd"}, "the three modifier keys Alfred shows"
+    assert set(present.NO_MODS) == {"shift", "alt", "cmd", "ctrl"}, "the four modifier keys"
 
 
 def test_the_edit_list_is_reached_from_the_conditional(plist, objects):

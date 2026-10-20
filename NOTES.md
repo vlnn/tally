@@ -81,12 +81,15 @@ marks it undone. A block is edited through its own transition and the next: its 
 turns the block's transition into a stop, or removes it when a stop is already before it. The
 edit list and `act apply` plan the same typed text with `edits.plan`, so the row and the act
 cannot disagree; the target travels as the `target` variable (`block:<id>`, `task:<line>`,
-`day:<date>`). Existing databases get the two new tables on the next connect.
+`day:<date>`). Editing starts from ⌃↩ on any task row (and on Stop and the day rows), with
+⌘↩ as a twin because Alfred may keep ⌃↩ for fallback searches; a task's edit list lists its
+newest blocks under the hints, which is the only way to a single block. There is no `edit`
+command word: it is too common in task names. Existing databases get the two new tables on the next connect.
 
 ## Deliberately not here
 
 - **Undo of starts and stops.** `t undo` takes back edits; a start or stop from the list is
-  one insert and is not journaled. `t edit` and `delete` on the block is the way back.
+  one insert and is not journaled. ⌃↩ on the task, then `delete` on the block, is the way back.
 - **Range insert.** `t parser 14:05-14:40` is two transitions, the second a copy of whatever ran
   at 14:40, so a block in the middle of another splits it. It is the first change with more than
   one row; `journal` is where it would go.

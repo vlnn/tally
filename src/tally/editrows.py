@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta
 
-from tally import edits
+from tally import edits, present
 from tally.present import NO_MODS, Row
 from tally.scope import Scope
 
@@ -18,6 +18,18 @@ def hint_row(hint: edits.Plan) -> Row:
         "autocomplete": hint.complete,
         "mods": NO_MODS,
     }
+
+
+BLOCKS_SHOWN = 12
+
+
+def block_rows(
+    target: edits.Target, db: sqlite3.Connection, now: datetime, scope: Scope
+) -> list[Row]:
+    if target.kind != edits.TASK:
+        return []
+    found = edits.task_blocks(db, target.value, scope)
+    return [present.block_row(b, now) for b in reversed(found[-BLOCKS_SHOWN:])]
 
 
 def plan_row(plan: edits.Plan, text: str, target: edits.Target) -> Row:
@@ -43,8 +55,13 @@ def rows(
     target = edits.target(encoded)
     if target is None:
         return [
-            {"title": "Nothing chosen to edit", "subtitle": "start from t edit", "valid": False}
+            {
+                "title": "Nothing chosen to edit",
+                "subtitle": "start with ⌃↩ on a task",
+                "valid": False,
+            }
         ]
     if not text.strip():
-        return [hint_row(hint) for hint in edits.hints(target.kind)]
+        hinted = [hint_row(hint) for hint in edits.hints(target.kind)]
+        return hinted + block_rows(target, db, now, scope)
     return [plan_row(edits.plan(db, target, text, now, starts, scope), text, target)]

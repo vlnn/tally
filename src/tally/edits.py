@@ -244,7 +244,9 @@ def task_plan(db: sqlite3.Connection, line: str, text: str, now: datetime, scope
     if change:
         return tag_plan(chosen, change, where, scope)
     if text.split()[0] in ("start", "end", "delete"):
-        return refused(f"{text.split()[0]} is for one block", "t edit lists them")
+        return refused(
+            f"{text.split()[0]} is for one block", "pick one from the list below the hints"
+        )
     return rename_plan(chosen, text, where)
 
 

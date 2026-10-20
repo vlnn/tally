@@ -63,6 +63,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</string>
+				<key>modifiers</key>
+				<integer>262144</integer>
+				<key>modifiersubtext</key>
+				<string>Edit</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</key>
 		<array>
@@ -229,6 +239,16 @@
 				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</string>
 				<key>modifiers</key>
 				<integer>1048576</integer>
+				<key>modifiersubtext</key>
+				<string>Edit</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</string>
+				<key>modifiers</key>
+				<integer>262144</integer>
 				<key>modifiersubtext</key>
 				<string>Edit</string>
 				<key>vitoclose</key>
@@ -719,8 +739,9 @@ t @today      the day as a ribbon, with totals (@yesterday, @week, @month, 2026-
 t bar         install the SwiftBar plugin: the running task in the menu bar
 t st ↩        stop (any command word works from two letters: to, yes, we, la, mo, ba)
 ⌥↩            stop the running task, from any task row
-t edit        the last week's blocks; ↩ on one to tag, retime, rename or delete it
-⌘↩            on a task: tag or rename all its blocks; on Today: tag the whole day
+⌃↩            on a task (found by typing, or Stop for the running one): rename or retag it,
+              its time stays; its blocks are listed below to retime or delete one
+              on Today: tag the whole day. ⌘↩ does the same.
 t undo        take the last edit back
 t nudge       turn nudges on or off: every 15 min, a notification you can ignore
 The second hotkey stops the running task without opening Alfred: give it a key.

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
@@ -217,7 +217,9 @@ def test_edit_hints_when_nothing_is_typed(db, sample):
         "a block offers every edit, ⇥ fills it in"
     )
     rows = editrows.rows("task:parser #lexer", "", db, NOW, NO_OFFSET, ALIASED)
-    assert [r["autocomplete"] for r in rows] == ["#", ""], "a task: tags and rename"
+    assert [r["autocomplete"] for r in rows if "autocomplete" in r] == ["#", ""], (
+        "a task: tags and rename"
+    )
 
 
 def test_an_edit_row_carries_the_text_and_target(db, sample):
@@ -227,32 +229,51 @@ def test_an_edit_row_carries_the_text_and_target(db, sample):
     )
 
 
-def test_t_edit_lists_the_weeks_blocks_newest_first(db, sample, logged):
-    logged(9, 0, "old", day=NOW.date() - timedelta(days=9))
-    logged(10, 0, "", day=NOW.date() - timedelta(days=9))
+def test_edit_is_a_word_like_any_other(db, sample):
     rows = present.rows("edit", db, NOW, NO_OFFSET)
-    assert [r["title"] for r in rows][:2] == ["parser #lexer", "review pr 212"], "newest first"
-    assert "old" not in [r["title"] for r in rows], "a week back at most"
-    assert rows[0]["variables"] == {"action": "edit", "target": f"block:{RUNNING}"}, "↩ edits it"
+    assert rows[0]["title"] == "Start edit", "edit is a task you can start, not a command"
 
 
-def test_t_edit_words_narrow(db, sample):
-    rows = present.rows("edit pa", db, NOW, NO_OFFSET)
-    assert [r["subtitle"][:11] for r in rows] == ["14:05–now ·", "11:05–12:50"], "parser only"
+def test_a_tasks_edit_list_shows_its_blocks_after_the_hints(db, sample):
+    rows = editrows.rows("task:parser #lexer", "", db, NOW, NO_OFFSET, ALIASED)
+    blocks = [r for r in rows if r.get("variables", {}).get("action") == "edit"]
+    assert [r["title"] for r in blocks] == ["14:05–now · 0:55", "11:05–12:50 · 1:45"], (
+        "newest first, so one block can be retimed or deleted"
+    )
+    assert blocks[0]["variables"]["target"] == f"block:{RUNNING}", "↩ opens that block's list"
 
 
-def test_ed_is_a_hint_to_type_edit(db, sample):
-    row = present.rows("ed", db, NOW, NO_OFFSET)[0]
-    assert (row["title"], row["autocomplete"]) == ("Edit a block", "edit "), "⇥ completes"
+def test_a_blocks_edit_list_has_no_block_rows(db, sample):
+    rows = editrows.rows(f"block:{PARSER}", "", db, NOW, NO_OFFSET, ALIASED)
+    assert all(r["valid"] is False for r in rows), "hints only"
 
 
-def test_task_and_day_rows_offer_cmd_to_edit(db, sample):
+EDIT_REVIEW = {"action": "edit", "target": "task:review pr 212"}
+
+
+@pytest.mark.parametrize("key", ["ctrl", "cmd"])
+def test_task_and_day_rows_offer_ctrl_to_edit(db, sample, key):
     rows = present.rows("", db, NOW, NO_OFFSET)
-    assert rows[0]["mods"]["cmd"]["variables"] == {
+    assert rows[0]["mods"][key]["variables"] == EDIT_REVIEW, "a recent task edits all of it"
+    assert rows[-2]["mods"][key]["variables"] == {
         "action": "edit",
-        "target": "task:review pr 212",
-    }, "⌘↩ on a task edits all of it"
-    assert rows[-1]["mods"]["cmd"]["variables"]["target"] == "day:2026-10-20", "⌘↩ on today"
+        "target": "task:parser #lexer",
+    }, "on Stop it edits the running task"
+    assert rows[-1]["mods"][key]["variables"]["target"] == "day:2026-10-20", "on today, the day"
+
+
+def test_ctrl_on_a_searched_task_edits_it(db, sample):
+    rows = present.rows("rev", db, NOW, NO_OFFSET)
+    found = next(r for r in rows if r["title"] == "Resume review pr 212")
+    assert found["mods"]["ctrl"]["variables"] == EDIT_REVIEW, "search, point, ⌃↩"
+    assert found["mods"]["ctrl"]["subtitle"] == "⌃↩ rename or retag this task, its time stays"
+
+
+def test_ctrl_on_an_exact_match_edits_it_and_on_a_new_line_does_nothing(db, sample):
+    known = present.rows("review pr 212", db, NOW, NO_OFFSET)[0]
+    assert known["mods"]["ctrl"]["variables"] == EDIT_REVIEW, "the Resume row of a known task"
+    new = present.rows("write tests", db, NOW, NO_OFFSET)[0]
+    assert new["mods"]["ctrl"]["valid"] is False, "nothing to edit before it exists"
 
 
 def test_undo_row(db, sample):

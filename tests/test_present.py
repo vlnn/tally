@@ -182,11 +182,7 @@ def test_a_rule_word_offers_the_view(db, sample):
             "variables": {"action": "view"},
             "mods": {
                 **present.NO_MODS,
-                "cmd": {
-                    "arg": "",
-                    "subtitle": "⌘↩ tag every block of the day",
-                    "variables": {"action": "edit", "target": "day:2026-10-19"},
-                },
+                **present.edit_mods("day:2026-10-19", "tag every block of the day"),
             },
         }
     ], "@yesterday is the one row that opens that day"
