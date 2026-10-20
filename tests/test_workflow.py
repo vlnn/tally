@@ -43,7 +43,7 @@ def test_every_script_calls_a_known_command(objects):
 
 
 def test_every_action_the_rows_emit_is_routed(objects):
-    emitted = {"start", "stop", "view", "bar"}
+    emitted = {"start", "stop", "view", "bar", "nudges"}
     branches = {
         cond["matchstring"]
         for obj in objects.values()

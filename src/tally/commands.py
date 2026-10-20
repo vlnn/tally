@@ -24,6 +24,7 @@ COMMANDS = (
     Command(("month", "this month"), "view", "@month"),
     Command(("last month", "lastmonth"), "view", "@lastmonth"),
     Command(("bar", "swiftbar"), "bar"),
+    Command(("nudge", "nudges"), "nudge"),
 )
 
 

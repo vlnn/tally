@@ -211,6 +211,16 @@ def bar_row(installed: Path | None) -> Row:
     }
 
 
+def nudge_row(on: bool, described: str) -> Row:
+    return {
+        "title": "Turn nudges off" if on else "Turn nudges on",
+        "subtitle": f"now on: {described}" if on else f"{described}, set in the workflow settings",
+        "arg": "",
+        "variables": {"action": "nudges"},
+        "mods": NO_MODS,
+    }
+
+
 def recent(db: sqlite3.Connection, now: datetime) -> list[store.Task]:
     active = store.running(db, now)
     found = store.tasks(db, now - timedelta(days=RECENT_DAYS), now)
@@ -248,7 +258,10 @@ def command_row(
     now: datetime,
     starts: timedelta,
     plugin: Callable[[], Path | None],
+    nudges: Callable[[], tuple[bool, str]],
 ) -> Row:
+    if command.kind == "nudge":
+        return nudge_row(*nudges())
     if command.kind == "stop":
         active = store.running(db, now)
         return stop_row(active, now) if active else idle_row()
@@ -270,13 +283,14 @@ def rows(
     now: datetime,
     starts: timedelta,
     plugin: Callable[[], Path | None] = lambda: None,
+    nudges: Callable[[], tuple[bool, str]] = lambda: (False, ""),
 ) -> list[Row]:
     words = text.split()
     if not words:
         return bare_rows(db, now, starts)
     if len(words) == 1 and days.DATE.match(words[0]):
         return date_rows(words[0], db, now, starts)
-    found = [command_row(c, db, now, starts, plugin) for c in commands.named(text)]
+    found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]
     if text.lstrip().startswith("@"):
         return found or [unknown_day_row(words[0])]
     return [*found, *typed_rows(text, db, now, starts)]

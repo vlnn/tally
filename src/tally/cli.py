@@ -11,7 +11,7 @@ from typing import Callable
 
 from hoard.alfred import data_folder
 
-from tally import bar, days, present, store, tags, view
+from tally import bar, days, nudge, present, store, tags, view
 
 NAME = "tally"
 DB_NAME = "tally.db"
@@ -60,7 +60,8 @@ def say(text: str) -> int:
 def filter_command(args: list[str], ctx: Context) -> int:
     text = args[0] if args else ""
     plugin = lambda: bar.plugin_path(ctx.env)  # noqa: E731
-    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts, plugin))
+    nudges = lambda: (nudge.installed(), nudge.describe(nudge.settings(ctx.env)))  # noqa: E731
+    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts, plugin, nudges))
 
 
 def start_command(args: list[str], ctx: Context) -> int:
@@ -94,6 +95,23 @@ def install_bar_command(args: list[str], ctx: Context) -> int:
         return say(f"Not installed: {missing} not found")
 
 
+def nudge_command(args: list[str], ctx: Context) -> int:
+    said = nudge.message(ctx.db, ctx.now, nudge.settings(ctx.env), nudge.user_idle())
+    if said:
+        bar.poke(ctx.env)
+        print(said)
+    return 0
+
+
+def nudges_command(args: list[str], ctx: Context) -> int:
+    if nudge.installed():
+        nudge.turn_off()
+        return say("Nudges off")
+    chosen = nudge.settings(ctx.env)
+    nudge.turn_on(chosen)
+    return say(f"Nudges on: {nudge.describe(chosen)}")
+
+
 def act_command(args: list[str], ctx: Context) -> int:
     if not args or args[0] not in ACTIONS:
         raise Usage(f"act needs one of {', '.join(ACTIONS)}")
@@ -120,6 +138,7 @@ ACTIONS: dict[str, Command] = {
     "start": start_command,
     "stop": stop_command,
     "bar": install_bar_command,
+    "nudges": nudges_command,
 }
 
 COMMANDS: dict[str, Command] = {
@@ -129,6 +148,7 @@ COMMANDS: dict[str, Command] = {
     "view": view_command,
     "today": today_command,
     "bar": bar_command,
+    "nudge": nudge_command,
 }
 
 USAGE = "usage: tally " + "|".join(COMMANDS) + " ..."

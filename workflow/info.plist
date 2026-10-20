@@ -131,6 +131,32 @@
 				<false/>
 			</dict>
 		</array>
+		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0B</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C05</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 	</dict>
 	<key>createdby</key>
 	<string>Volodymyr Anokhin</string>
@@ -142,6 +168,45 @@
 	<string>Tally</string>
 	<key>objects</key>
 	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<false/>
+				<key>triggerid</key>
+				<string>nudge</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0A</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/python3 -m tally nudge
+</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0B</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 		<dict>
 			<key>config</key>
 			<dict>
@@ -418,6 +483,7 @@ t @today      the day as a ribbon, with totals (@yesterday, @week, @month, 2026-
 t bar         install the SwiftBar plugin: the running task in the menu bar
 t st ↩        stop (any command word works from two letters: to, yes, we, la, mo, ba)
 ⌥↩            stop the running task, from any task row
+t nudge       turn nudges on or off: every 15 min, a notification you can ignore
 The second hotkey stops the running task without opening Alfred: give it a key.
 </string>
 	<key>uidata</key>
@@ -485,9 +551,84 @@ The second hotkey stops the running task without opening Alfred: give it a key.
 			<key>ypos</key>
 			<integer>260</integer>
 		</dict>
+		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0A</key>
+		<dict>
+			<key>xpos</key>
+			<integer>40</integer>
+			<key>ypos</key>
+			<integer>380</integer>
+		</dict>
+		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0B</key>
+		<dict>
+			<key>xpos</key>
+			<integer>660</integer>
+			<key>ypos</key>
+			<integer>380</integer>
+		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
 	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>15</string>
+				<key>placeholder</key>
+				<string>15</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Minutes between nudges; 0 stops them. Type t nudge again after changing it.</string>
+			<key>label</key>
+			<string>Nudge every</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>nudge_every</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>09:00-19:00</string>
+				<key>placeholder</key>
+				<string>09:00-19:00</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Nudges only come between these times.</string>
+			<key>label</key>
+			<string>Nudge between</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>nudge_hours</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<false/>
+				<key>required</key>
+				<false/>
+				<key>text</key>
+				<string>Nudge on Saturday and Sunday too</string>
+			</dict>
+			<key>description</key>
+			<string></string>
+			<key>label</key>
+			<string>Weekends</string>
+			<key>type</key>
+			<string>checkbox</string>
+			<key>variable</key>
+			<string>nudge_weekends</string>
+		</dict>
 		<dict>
 			<key>config</key>
 			<dict>

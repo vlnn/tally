@@ -12,6 +12,7 @@ data folder) and nothing of the kernel.
 | `timewords` | the last word of a line as a time                                     | a new way to say when                 |
 | `commands`  | words that name a command (stop, today, week, bar…) and their prefixes | a new command word                   |
 | `tags`      | tags in a line, aliases from the setting, time under each tag          | a tag gets a meaning beyond grouping  |
+| `nudge`     | when to nudge and what to say, the launchd agent, how long the user has been idle | a new reason to stay quiet |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
@@ -53,6 +54,17 @@ A backfilled start is one insert. Later than the running task started, it ends i
 it becomes a past block: whatever ran at that time is cut there and the block ends at the next
 transition, which is why the running task keeps running and `Now` does not move. The row's
 subtitle spells this out before ↩.
+
+## Nudges
+
+A launchd agent with `StartInterval` runs `osascript` to ask Alfred for the external trigger
+`nudge`, which runs `tally nudge` and posts whatever it prints through the canvas's
+notification object. Going through Alfred rather than running the bundle from launchd keeps
+the settings in one place and survives the bundle moving on reinstall. Ignoring a nudge writes
+nothing: confirmation is the absence of a switch. Quiet when the last transition is younger than
+the interval, when `ioreg`'s `HIDIdleTime` is longer than it, outside the hours, and at weekends
+unless asked. A clickable nudge (click opens `t`) needs SwiftBar's notify URL or a helper app;
+Alfred's notifications do nothing on click.
 
 ## Deliberately not here
 

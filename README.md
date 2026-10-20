@@ -31,11 +31,34 @@ Three ways, fastest first:
   long before you press it.
 - **`t st` ↩.** Typing a command word puts it on top (see below).
 
+## Nudges
+
+`t nudge` ↩ turns them on: every 15 minutes between 09:00 and 19:00 on weekdays, a
+notification says what tally thinks you are doing.
+
+```
+Still on parser #lexer · 0:42? Ignore to keep it.
+Nothing running since 13:40. Ignore if you're away.
+Nothing logged today. Type t to start.
+```
+
+Ignoring a nudge is the confirmation: nothing is written, the task keeps running or the gap
+stays a gap. Anything else is a switch, done the usual way in `t`. A nudge is skipped when you
+switched less than an interval ago, when the Mac has had no key press or mouse move for an
+interval (nobody to read it; the next one comes when you are back), and outside the hours.
+
+**Nudge every**, **Nudge between** and **Weekends** in the workflow settings change that; `0`
+turns them off. Type `t nudge` twice after changing the interval, once off and once on, so
+launchd picks it up. Underneath, a launchd agent (`~/Library/LaunchAgents/com.anokhin.tally.nudge.plist`)
+asks Alfred to run the workflow's `nudge` trigger, so the check uses the workflow's settings and
+the notification is Alfred's. The first time, macOS asks whether `osascript` may control Alfred;
+say yes.
+
 ## Command words
 
 The first two letters of a command's name put its row above everything else, so `t st`,
 `t to`, `t yes`, `t we`, `t la` and `t mo` reach Stop, Today, Yesterday, This week, Last week
-and Last month, and `t ba` the SwiftBar plugin. The Start row for what you typed and the
+and Last month, `t ba` the SwiftBar plugin and `t nu` the nudges. The Start row for what you typed and the
 matching tasks stay below, so typing on to `t standup` still finds it. With a leading `@`
 (`@today`, `@week`) only the views are listed.
 
