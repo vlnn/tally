@@ -10,6 +10,7 @@ data folder) and nothing of the kernel.
 | `store`     | the table of transitions; blocks, running, tasks, spelling            | a transition gets a column, a new read |
 | `days`      | when a day starts, which day a moment is, the `@today`/`@week` words  | a new rule word                       |
 | `timewords` | the last word of a line as a time                                     | a new way to say when                 |
+| `commands`  | words that name a command (stop, today, week, bar…) and their prefixes | a new command word                   |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
@@ -18,7 +19,8 @@ data folder) and nothing of the kernel.
 
 The canvas is `workflow/info.plist`: hotkey → script filter `t` → a conditional on `action`
 (`view` to the Text View, else to `tally act "$action" "$1"`) → a notification with the
-action's one line. The Text View runs the `view` script at the bundle root and ↩ copies its
+action's one line. ⇧↩ and ⌥↩ take the same path, carrying their own `action`. A second hotkey
+goes straight to `tally act stop` and the same notification. The Text View runs the `view` script at the bundle root and ↩ copies its
 text. A new action is a `variables.action` value in `present` and an entry in `cli.ACTIONS`; the
 plist changes only when the action needs an Alfred object. `tests/test_workflow.py` cross-checks
 the plist against the package, so a mismatch fails before Alfred sees it.

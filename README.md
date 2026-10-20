@@ -16,7 +16,28 @@ t coffee -20m            Start coffee              from 14:40 · ends parser #le
 t @today                 Today                     4:40 logged · ↩ shows the day
 t @week                  This week                 17:15 logged · ↩ shows the week
 t bar                    Install the SwiftBar plugin   the running task in the menu bar
+t st                     Stop                      parser #lexer · 0:55 since 14:05
+t to                     Today                     4:40 logged · ↩ shows the day
 ```
+
+## Stopping
+
+Three ways, fastest first:
+
+- **The stop hotkey.** The workflow has a second hotkey object that stops the running task
+  without opening Alfred; a notification says what stopped and for how long. Alfred clears
+  hotkeys on import, so double-click it and give it a key (HYPER+S, say).
+- **⌥↩ on any task row.** `t` then ⌥↩ stops whatever runs; the subtitle says what and for how
+  long before you press it.
+- **`t st` ↩.** Typing a command word puts it on top (see below).
+
+## Command words
+
+The first two letters of a command's name put its row above everything else, so `t st`,
+`t to`, `t yes`, `t we`, `t la` and `t mo` reach Stop, Today, Yesterday, This week, Last week
+and Last month, and `t ba` the SwiftBar plugin. The Start row for what you typed and the
+matching tasks stay below, so typing on to `t standup` still finds it. With a leading `@`
+(`@today`, `@week`) only the views are listed.
 
 A block is the time between one transition and the next. The database holds transitions only
 (`at`, `line`, `logged_at`); blocks, gaps, tallies and the ribbon are all read from that, so
@@ -30,8 +51,9 @@ nothing stored can disagree with anything else.
    Alfred's data folder for the workflow, which survives updates.
 3. Optional: **Day starts at**. With `04:00`, work at one in the morning belongs to the evening
    before. Every tally is recomputed from this, so changing it changes history too.
-4. The hotkey object is wired for HYPER+T (⌃⌥⇧⌘T). Alfred clears hotkeys on import, so
-   double-click it once and press the combination you want.
+4. The hotkey objects are wired for HYPER+T (⌃⌥⇧⌘T) to open `t` and nothing yet to stop.
+   Alfred clears hotkeys on import, so double-click each once and press the combination you
+   want.
 
 ## Requirements
 
@@ -60,6 +82,7 @@ are every past task matching by word prefix, newest start first, each ↩ resumi
 | ---- | ----------------------------------------------------------------------------------- |
 | ↩    | start now                                                                           |
 | ⇧↩   | start where the last block ended, filling the gap (only when nothing is running)    |
+| ⌥↩   | stop the running task                                                               |
 | ⌘C   | copy the line                                                                       |
 | ⌘L   | large type                                                                          |
 

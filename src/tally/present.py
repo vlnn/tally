@@ -10,7 +10,7 @@ from typing import TypedDict
 
 from hoard.alfred import matches
 
-from tally import days, store, timewords
+from tally import commands, days, store, timewords
 
 RECENT_DAYS = 7
 RECENT_LIMIT = 7
@@ -97,6 +97,22 @@ def gap_mod(db: sqlite3.Connection, now: datetime) -> Mod:
     }
 
 
+def stop_mod(db: sqlite3.Connection, now: datetime) -> Mod:
+    active = store.running(db, now)
+    if active is None:
+        return {"valid": False, "subtitle": "⌥↩ nothing to stop"}
+    return {
+        "arg": "",
+        "subtitle": f"⌥↩ stop {active.line} · {hm(active.length(now))}",
+        "variables": {"action": "stop"},
+    }
+
+
+def task_mods(db: sqlite3.Connection, now: datetime, fill: bool = True) -> dict[str, Mod]:
+    shift = gap_mod(db, now) if fill else NO_MODS["shift"]
+    return {**NO_MODS, "shift": shift, "alt": stop_mod(db, now)}
+
+
 def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime) -> Row:
     return {
         "title": f"Resume {task.line}",
@@ -104,7 +120,7 @@ def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime
         "arg": task.line,
         "variables": start_variables(None),
         "text": {"copy": task.line, "largetype": task.line},
-        "mods": {**NO_MODS, "shift": gap_mod(db, now)},
+        "mods": task_mods(db, now),
     }
 
 
@@ -123,7 +139,7 @@ def start_row(typed: timewords.Typed, db: sqlite3.Connection, now: datetime) -> 
     line = known or typed.line
     verb = "Resume" if known else "Start"
     subtitle = effect(typed.at, db, now) if typed.at else "↩ from now"
-    mods = NO_MODS if typed.at else {**NO_MODS, "shift": gap_mod(db, now)}
+    mods = task_mods(db, now, fill=typed.at is None)
     return {
         "title": f"{verb} {line}",
         "subtitle": subtitle,
@@ -144,6 +160,19 @@ def stop_row(active: store.Block, now: datetime) -> Row:
         "subtitle": f"{active.line} · {hm(active.length(now))} since {active.start:%H:%M}",
         "arg": "",
         "variables": {"action": "stop"},
+        "mods": NO_MODS,
+    }
+
+
+def idle_row() -> Row:
+    return {"title": "Nothing to stop", "subtitle": "no task is running", "valid": False}
+
+
+def unknown_day_row(word: str) -> Row:
+    return {
+        "title": f"{word} is not a day",
+        "subtitle": "@today, @yesterday, @week, @lastweek, @month, @lastmonth or 2026-10-19",
+        "valid": False,
         "mods": NO_MODS,
     }
 
@@ -213,6 +242,28 @@ def typed_rows(text: str, db: sqlite3.Connection, now: datetime, starts: timedel
     return [top, *similar]
 
 
+def command_row(
+    command: commands.Command,
+    db: sqlite3.Connection,
+    now: datetime,
+    starts: timedelta,
+    plugin: Callable[[], Path | None],
+) -> Row:
+    if command.kind == "stop":
+        active = store.running(db, now)
+        return stop_row(active, now) if active else idle_row()
+    if command.kind == "bar":
+        return bar_row(plugin())
+    shown = days.asked(command.word, now, starts)
+    assert shown is not None
+    return view_row(shown, db, now, starts, command.word)
+
+
+def date_rows(word: str, db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[Row]:
+    shown = days.asked(word, now, starts)
+    return [view_row(shown, db, now, starts, word)] if shown else [unknown_day_row(word)]
+
+
 def rows(
     text: str,
     db: sqlite3.Connection,
@@ -221,11 +272,11 @@ def rows(
     plugin: Callable[[], Path | None] = lambda: None,
 ) -> list[Row]:
     words = text.split()
-    if words == ["bar"]:
-        return [bar_row(plugin())]
-    if len(words) == 1 and days.is_rule(words[0]):
-        shown = days.asked(words[0], now, starts)
-        return [view_row(shown, db, now, starts, words[0])] if shown else []
     if not words:
         return bare_rows(db, now, starts)
-    return typed_rows(text, db, now, starts)
+    if len(words) == 1 and days.DATE.match(words[0]):
+        return date_rows(words[0], db, now, starts)
+    found = [command_row(c, db, now, starts, plugin) for c in commands.named(text)]
+    if text.lstrip().startswith("@"):
+        return found or [unknown_day_row(words[0])]
+    return [*found, *typed_rows(text, db, now, starts)]

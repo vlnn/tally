@@ -85,12 +85,21 @@ def test_every_source_object_has_a_way_out(plist, objects):
             assert plist["connections"].get(uid), f"{obj['type']} {uid} leads nowhere"
 
 
-def test_the_keyword_has_a_hotkey(plist, objects):
+def test_hotkeys_open_t_or_stop(plist, objects):
     hotkeys = [u for u, o in objects.items() if o["type"] == "alfred.workflow.trigger.hotkey"]
-    filters = {u for u, o in objects.items() if o["type"] == "alfred.workflow.input.scriptfilter"}
-    assert all(plist["connections"][h][0]["destinationuid"] in filters for h in hotkeys), (
-        "hyper+T opens the t filter"
+    targets = [objects[plist["connections"][h][0]["destinationuid"]] for h in hotkeys]
+    kinds = sorted(
+        target["config"].get("keyword") or target["config"]["script"].strip() for target in targets
     )
+    assert kinds == ["/usr/bin/python3 -m tally act stop", "t"], (
+        "one hotkey opens t, the other stops without opening Alfred"
+    )
+
+
+def test_alt_return_from_the_filter_reaches_act(plist, objects):
+    filters = [u for u, o in objects.items() if o["type"] == "alfred.workflow.input.scriptfilter"]
+    modifiers = {link["modifiers"] for link in plist["connections"][filters[0]]}
+    assert modifiers == {0, 131072, 524288}, "↩, ⇧↩ and ⌥↩ all pass through to the conditional"
 
 
 def test_the_text_view_runs_the_shipped_script(objects):
