@@ -21,6 +21,20 @@ create table if not exists transitions (
     logged_at text not null
 );
 create index if not exists transitions_at on transitions(at);
+create table if not exists batches (
+    id integer primary key,
+    said text not null,
+    at text not null,
+    undone integer not null default 0
+);
+create table if not exists before (
+    batch integer not null,
+    id integer not null,
+    at text,
+    line text,
+    logged_at text,
+    existed integer not null
+);
 """
 
 BACKFILL_SLACK = timedelta(minutes=10)
@@ -42,6 +56,7 @@ class Block(NamedTuple):
     end: datetime | None
     line: str
     logged_at: datetime
+    id: int = 0
 
     def length(self, now: datetime) -> timedelta:
         return (self.end or now) - self.start
@@ -107,7 +122,7 @@ def blocks(changes: Iterable[Transition]) -> list[Block]:
     ordered = list(changes)
     ends = [after.at for after in ordered[1:]] + [None]
     return [
-        Block(change.at, end, change.line, change.logged_at)
+        Block(change.at, end, change.line, change.logged_at, change.id)
         for change, end in zip(ordered, ends)
         if not change.stop
     ]

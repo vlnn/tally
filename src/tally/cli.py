@@ -11,7 +11,7 @@ from typing import Callable
 
 from hoard.alfred import data_folder
 
-from tally import bar, days, nudge, present, scope, store, tags, view
+from tally import bar, days, editrows, edits, journal, nudge, present, scope, store, tags, view
 
 NAME = "tally"
 DB_NAME = "tally.db"
@@ -64,7 +64,7 @@ def listed(text: str, ctx: Context, chosen: scope.Scope) -> int:
 
 
 def filter_command(args: list[str], ctx: Context) -> int:
-    return listed(args[0] if args else "", ctx, scope.Scope("", ctx.aliases))
+    return listed(args[0] if args else "", ctx, everything(ctx))
 
 
 def filter_work_command(args: list[str], ctx: Context) -> int:
@@ -120,6 +120,37 @@ def nudges_command(args: list[str], ctx: Context) -> int:
     return say(f"Nudges on: {nudge.describe(chosen)}")
 
 
+def everything(ctx: Context) -> scope.Scope:
+    return scope.Scope("", ctx.aliases)
+
+
+def edit_command(args: list[str], ctx: Context) -> int:
+    text = args[0] if args else ""
+    target = ctx.env.get("target", "")
+    return emit(editrows.rows(target, text, ctx.db, ctx.now, ctx.starts, everything(ctx)))
+
+
+def apply_command(args: list[str], ctx: Context) -> int:
+    target = edits.target(ctx.env.get("target", ""))
+    text = " ".join(args).strip()
+    if target is None or not text:
+        raise Usage("apply needs a target variable and the edit")
+    plan = edits.plan(ctx.db, target, text, ctx.now, ctx.starts, everything(ctx))
+    if not plan.valid:
+        return say(plan.title)
+    journal.apply(ctx.db, list(plan.ops), plan.title, ctx.now)
+    bar.poke(ctx.env)
+    return say(plan.title)
+
+
+def undo_command(args: list[str], ctx: Context) -> int:
+    batch = journal.undo(ctx.db)
+    if batch is None:
+        return say("Nothing to undo")
+    bar.poke(ctx.env)
+    return say(f"Undone: {batch.said}")
+
+
 def act_command(args: list[str], ctx: Context) -> int:
     if not args or args[0] not in ACTIONS:
         raise Usage(f"act needs one of {', '.join(ACTIONS)}")
@@ -147,6 +178,8 @@ ACTIONS: dict[str, Command] = {
     "stop": stop_command,
     "bar": install_bar_command,
     "nudges": nudges_command,
+    "apply": apply_command,
+    "undo": undo_command,
 }
 
 COMMANDS: dict[str, Command] = {
@@ -158,6 +191,7 @@ COMMANDS: dict[str, Command] = {
     "today": today_command,
     "bar": bar_command,
     "nudge": nudge_command,
+    "edit": edit_command,
 }
 
 USAGE = "usage: tally " + "|".join(COMMANDS) + " ..."

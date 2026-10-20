@@ -15,6 +15,7 @@ ROUTED = {
     "alfred_workflow_uid",
     "action",
     "at",
+    "target",
 }
 
 
@@ -43,7 +44,7 @@ def test_every_script_calls_a_known_command(objects):
 
 
 def test_every_action_the_rows_emit_is_routed(objects):
-    emitted = {"start", "stop", "view", "bar", "nudges"}
+    emitted = {"start", "stop", "view", "bar", "nudges", "edit", "apply", "undo"}
     branches = {
         cond["matchstring"]
         for obj in objects.values()
@@ -108,10 +109,16 @@ def test_the_two_list_hotkeys_are_the_brackets(plist, objects):
 
 
 def test_alt_return_from_the_filter_reaches_act(plist, objects):
-    filters = [u for u, o in objects.items() if o["type"] == "alfred.workflow.input.scriptfilter"]
+    filters = [
+        u
+        for u, o in objects.items()
+        if o["type"] == "alfred.workflow.input.scriptfilter" and o["config"]["keyword"]
+    ]
     for uid in filters:
         modifiers = {link["modifiers"] for link in plist["connections"][uid]}
-        assert modifiers == {0, 131072, 524288}, "↩, ⇧↩ and ⌥↩ pass through from both lists"
+        assert modifiers == {0, 131072, 524288, 1048576}, (
+            "↩, ⇧↩, ⌥↩ and ⌘↩ pass through from both lists"
+        )
 
 
 def test_the_text_view_runs_the_shipped_script(objects):
@@ -136,3 +143,22 @@ def test_configured_variables_are_the_ones_the_package_reads(plist):
 
 def test_rows_never_emit_a_modifier_the_canvas_does_not_route():
     assert set(present.NO_MODS) == {"shift", "alt", "cmd"}, "the three modifier keys Alfred shows"
+
+
+def test_the_edit_list_is_reached_from_the_conditional(plist, objects):
+    edit = [
+        u
+        for u, o in objects.items()
+        if o["type"] == "alfred.workflow.input.scriptfilter"
+        and "tally edit" in o["config"]["script"]
+    ]
+    assert len(edit) == 1 and objects[edit[0]]["config"]["keyword"] == "", "a keywordless list"
+    sources = [
+        s
+        for s, links in plist["connections"].items()
+        for link in links
+        if link["destinationuid"] == edit[0]
+    ]
+    assert [objects[s]["type"] for s in sources] == ["alfred.workflow.utility.conditional"], (
+        "only the action conditional opens it"
+    )

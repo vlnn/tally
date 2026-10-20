@@ -180,7 +180,14 @@ def test_a_rule_word_offers_the_view(db, sample):
             "subtitle": "0:00 logged · ↩ shows the day",
             "arg": "@yesterday",
             "variables": {"action": "view"},
-            "mods": present.NO_MODS,
+            "mods": {
+                **present.NO_MODS,
+                "cmd": {
+                    "arg": "",
+                    "subtitle": "⌘↩ tag every block of the day",
+                    "variables": {"action": "edit", "target": "day:2026-10-19"},
+                },
+            },
         }
     ], "@yesterday is the one row that opens that day"
 

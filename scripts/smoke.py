@@ -9,8 +9,8 @@ import zipfile
 from pathlib import Path
 
 
-def run(bundle, data, *args):
-    env = {**os.environ, "alfred_workflow_data": data, "PYTHONPATH": ""}
+def run(bundle, data, *args, **extra):
+    env = {**os.environ, "alfred_workflow_data": data, "PYTHONPATH": "", **extra}
     done = subprocess.run(
         [sys.executable, "-m", "tally", *args],
         cwd=bundle,
@@ -32,9 +32,12 @@ def main(archive):
         rows = json.loads(run(bundle, data, "filter", ""))["items"]
         assert [r["title"] for r in rows][-2:] == ["Stop", "Today"], rows
         assert "parser #lexer" in run(bundle, data, "act", "stop")
+        edit_env = {"target": "task:parser #lexer"}
+        assert run(bundle, data, "act", "apply", "#w", **edit_env).strip() == "Add #w · 1 block"
+        assert run(bundle, data, "act", "undo").startswith("Undone: Add #w")
         shown = json.loads(run(bundle, data, "view", "@today"))
         assert "#lexer" in shown["response"], shown
-        print("ok: the bundle starts, lists, stops and shows the day")
+        print("ok: the bundle starts, lists, stops, edits, undoes and shows the day")
 
 
 if __name__ == "__main__":

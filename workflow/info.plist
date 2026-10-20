@@ -53,6 +53,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</string>
+				<key>modifiers</key>
+				<integer>1048576</integer>
+				<key>modifiersubtext</key>
+				<string>Edit</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</key>
 		<array>
@@ -65,6 +75,18 @@
 				<string></string>
 				<key>sourceoutputuid</key>
 				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C10</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0E</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C11</string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -199,6 +221,29 @@
 				<integer>524288</integer>
 				<key>modifiersubtext</key>
 				<string>Stop the running task</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</string>
+				<key>modifiers</key>
+				<integer>1048576</integer>
+				<key>modifiersubtext</key>
+				<string>Edit</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0E</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C03</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
 				<key>vitoclose</key>
 				<false/>
 			</dict>
@@ -407,6 +452,20 @@
 						<key>uid</key>
 						<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C10</string>
 					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string>{var:action}</string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>edit</string>
+						<key>outputlabel</key>
+						<string>edit</string>
+						<key>uid</key>
+						<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C11</string>
+					</dict>
 				</array>
 				<key>elselabel</key>
 				<string>act</string>
@@ -597,6 +656,55 @@
 			<key>version</key>
 			<integer>3</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<false/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>keyword</key>
+				<string></string>
+				<key>queuedelaycustom</key>
+				<integer>1</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string></string>
+				<key>script</key>
+				<string>/usr/bin/python3 -m tally edit "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>#tag, -#tag, start 14:05, end 14:40, delete, or a new name</string>
+				<key>title</key>
+				<string>Edit</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0E</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>Tally logs time by switching tasks.
@@ -611,6 +719,9 @@ t @today      the day as a ribbon, with totals (@yesterday, @week, @month, 2026-
 t bar         install the SwiftBar plugin: the running task in the menu bar
 t st ↩        stop (any command word works from two letters: to, yes, we, la, mo, ba)
 ⌥↩            stop the running task, from any task row
+t edit        the last week's blocks; ↩ on one to tag, retime, rename or delete it
+⌘↩            on a task: tag or rename all its blocks; on Today: tag the whole day
+t undo        take the last edit back
 t nudge       turn nudges on or off: every 15 min, a notification you can ignore
 The second hotkey stops the running task without opening Alfred: give it a key.
 </string>
@@ -706,6 +817,13 @@ The second hotkey stops the running task without opening Alfred: give it a key.
 			<integer>240</integer>
 			<key>ypos</key>
 			<integer>160</integer>
+		</dict>
+		<key>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C0E</key>
+		<dict>
+			<key>xpos</key>
+			<integer>660</integer>
+			<key>ypos</key>
+			<integer>480</integer>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>

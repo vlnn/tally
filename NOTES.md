@@ -14,6 +14,9 @@ data folder) and nothing of the kernel.
 | `tags`      | tags in a line, aliases from the setting, time under each tag          | a tag gets a meaning beyond grouping  |
 | `nudge`     | when to nudge and what to say, the launchd agent, how long the user has been idle | a new reason to stay quiet |
 | `scope`     | which tasks a list is about (all, or one tag), adding that tag, task identity across aliases | a list scoped by more than one tag |
+| `journal`   | edits as batches of ops on transitions, each batch's before-image, undo | a new kind of op |
+| `edits`     | what text typed in the edit list means for a block, a task or a day; refusals | a new edit word |
+| `editrows`  | the edit list's rows: hints, the planned change, the refusal | the edit list shows something new |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
@@ -67,18 +70,26 @@ the interval, when `ioreg`'s `HIDIdleTime` is longer than it, outside the hours,
 unless asked. A clickable nudge (click opens `t`) needs SwiftBar's notify URL or a helper app;
 Alfred's notifications do nothing on click.
 
+## Editing
+
+The model is still transitions only. An edit is a batch of three kinds of op on them (update
+`at` or `line`, insert, delete), and before each op the row as it was goes into `before`
+under the batch, an insert noting the new id; undo replays a batch's `before` backwards and
+marks it undone. A block is edited through its own transition and the next: its start is its
+`at`, its end is the next one's. Moving an end earlier inserts a stop unless a stop is next
+(then the stop moves); later moves the next transition and so shortens what follows. Deleting
+turns the block's transition into a stop, or removes it when a stop is already before it. The
+edit list and `act apply` plan the same typed text with `edits.plan`, so the row and the act
+cannot disagree; the target travels as the `target` variable (`block:<id>`, `task:<line>`,
+`day:<date>`). Existing databases get the two new tables on the next connect.
+
 ## Deliberately not here
 
-- **Undo.** Every change is one insert, and the first version has no way to take one back. When
-  it comes: a `superseded` column pointing at the row that replaced it, every read filtered on
-  `superseded is null`, a change as the set of rows it superseded, undo as clearing that column.
-  The schema change is additive; `store.transitions` is the one query to touch.
+- **Undo of starts and stops.** `t undo` takes back edits; a start or stop from the list is
+  one insert and is not journaled. `t edit` and `delete` on the block is the way back.
 - **Range insert.** `t parser 14:05-14:40` is two transitions, the second a copy of whatever ran
   at 14:40, so a block in the middle of another splits it. It is the first change with more than
-  one row and the reason undo comes first.
-- **Editing a block.** A keywordless menu on ⌘↩: *started* and *ended* retime this transition or
-  the next one (an end is always someone else's start), *rename*, *trash*. wisp's `menu` script
-  filter is the shape.
+  one row; `journal` is where it would go.
 - **Day-end cap.** `t @yesterday` noticing a block that ran all night and offering a stop at a
   setting or at the time the Mac slept (`pmset -g log`). A plan row: describe, act on ↩.
 - **Ranges of your own.** `@week` and `@month` (and their `last`) are the only ranges; `2026-10`

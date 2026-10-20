@@ -10,7 +10,7 @@ from typing import TypedDict
 
 from hoard.alfred import matches
 
-from tally import commands, days, store, timewords
+from tally import commands, days, journal, store, timewords
 from tally.scope import Scope
 
 EVERYTHING = Scope()
@@ -34,6 +34,7 @@ class Row(TypedDict, total=False):
     variables: dict[str, str]
     mods: dict[str, Mod]
     text: dict[str, str]
+    autocomplete: str
 
 
 NO_MODS: dict[str, Mod] = {mod: {"valid": False, "subtitle": ""} for mod in ("shift", "alt", "cmd")}
@@ -116,6 +117,10 @@ def task_mods(db: sqlite3.Connection, now: datetime, fill: bool = True) -> dict[
     return {**NO_MODS, "shift": shift, "alt": stop_mod(db, now)}
 
 
+def edit_mod(target: str, subtitle: str) -> Mod:
+    return {"arg": "", "subtitle": subtitle, "variables": {"action": "edit", "target": target}}
+
+
 def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime) -> Row:
     return {
         "title": f"Resume {task.line}",
@@ -123,7 +128,10 @@ def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime
         "arg": task.line,
         "variables": start_variables(None),
         "text": {"copy": task.line, "largetype": task.line},
-        "mods": task_mods(db, now),
+        "mods": {
+            **task_mods(db, now),
+            "cmd": edit_mod(f"task:{task.line}", "⌘↩ tag or rename every block of this task"),
+        },
     }
 
 
@@ -199,12 +207,16 @@ def view_row(
     logged = sum((b.length(now) for b in blocks), timedelta())
     what = "day" if shown.length == 1 else name.split()[-1]
     part = scoped_total(blocks, now, scope) if scope.tag else ""
+    mods = NO_MODS
+    if shown.length == 1:
+        target = f"day:{shown.day.isoformat()}"
+        mods = {**NO_MODS, "cmd": edit_mod(target, "⌘↩ tag every block of the day")}
     return {
         "title": name.capitalize(),
         "subtitle": f"{hm(logged)} logged{part} · ↩ shows the {what}",
         "arg": word,
         "variables": {"action": "view"},
-        "mods": NO_MODS,
+        "mods": mods,
     }
 
 
@@ -232,6 +244,63 @@ def nudge_row(on: bool, described: str) -> Row:
         "subtitle": f"now on: {described}" if on else f"{described}, set in the workflow settings",
         "arg": "",
         "variables": {"action": "nudges"},
+        "mods": NO_MODS,
+    }
+
+
+EDITABLE_DAYS = 7
+EDITABLE_LIMIT = 40
+
+
+def block_row(block: store.Block, now: datetime) -> Row:
+    target = f"block:{block.id}"
+    return {
+        "title": block.line,
+        "subtitle": f"{when(block.start, now)}–{f'{block.end:%H:%M}' if block.end else 'now'}"
+        f" · {hm(block.length(now))} · ↩ edit, tag, retime or delete",
+        "arg": "",
+        "variables": {"action": "edit", "target": target},
+        "mods": NO_MODS,
+    }
+
+
+def block_rows(words: list[str], db: sqlite3.Connection, now: datetime, scope: Scope) -> list[Row]:
+    since = now - timedelta(days=EDITABLE_DAYS)
+    wanted = " ".join(words)
+    found = [
+        b
+        for b in store.blocks(store.transitions(db, None, now + timedelta(minutes=1)))
+        if (b.end or now) > since and scope.holds(b.line) and matches(wanted, b.line)
+    ]
+    chosen = list(reversed(found))[:EDITABLE_LIMIT]
+    if not chosen:
+        return [{"title": "No blocks to edit", "subtitle": "in the last week", "valid": False}]
+    return [block_row(b, now) for b in chosen]
+
+
+def edit_hint_row() -> Row:
+    return {
+        "title": "Edit a block",
+        "subtitle": "the last week's blocks, newest first; type words after edit to narrow",
+        "valid": False,
+        "autocomplete": "edit ",
+        "mods": NO_MODS,
+    }
+
+
+def undo_row(db: sqlite3.Connection) -> Row:
+    batch = journal.last(db)
+    if batch is None:
+        return {
+            "title": "Nothing to undo",
+            "subtitle": "edits made in t edit can be undone",
+            "valid": False,
+        }
+    return {
+        "title": f"Undo: {batch.said}",
+        "subtitle": f"made {batch.at:%H:%M} {batch.at:%a %-d %b}",
+        "arg": "",
+        "variables": {"action": "undo"},
         "mods": NO_MODS,
     }
 
@@ -293,6 +362,10 @@ def command_row(
 ) -> Row:
     if command.kind == "nudge":
         return nudge_row(*nudges())
+    if command.kind == "edit":
+        return edit_hint_row()
+    if command.kind == "undo":
+        return undo_row(db)
     if command.kind == "stop":
         active = store.running(db, now)
         return stop_row(active, now) if active else idle_row()
@@ -320,6 +393,8 @@ def rows(
     words = text.split()
     if not words:
         return bare_rows(db, now, starts, scope)
+    if words[0].lower() == "edit":
+        return block_rows(words[1:], db, now, scope)
     if len(words) == 1 and days.DATE.match(words[0]):
         return date_rows(words[0], db, now, starts)
     found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]
