@@ -58,21 +58,20 @@ jobs:
     if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: Tally.alfredworkflow
           path: dist
-      - run: |
-          git tag -f latest
-          git push -f origin latest
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: latest
-          prerelease: true
-          files: dist/Tally.alfredworkflow
+      - run: gh release delete latest --yes --cleanup-tag || true
+      - run: >
+          gh release create latest dist/Tally.alfredworkflow
+          --prerelease --title "latest · ${GITHUB_SHA::7}" --target "$GITHUB_SHA"
+          --notes "Built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M') UTC.
+          Download Tally.alfredworkflow and double-click it."
 
   release:
     runs-on: ubuntu-latest
