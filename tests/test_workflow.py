@@ -16,6 +16,7 @@ ROUTED = {
     "action",
     "at",
     "target",
+    "replace",
 }
 
 
@@ -56,6 +57,9 @@ def test_every_action_the_rows_emit_is_routed(objects):
         "undo",
         "remember",
         "forget",
+        "forget-all",
+        "preview",
+        "retype",
     }
     branches = {
         cond["matchstring"]
@@ -198,3 +202,14 @@ def test_a_reminder_fires_into_large_type(plist, objects):
     assert "-m tally remind" in run["config"]["script"], "the trigger runs tally remind"
     shown = objects[plist["connections"][run["uid"]][0]["destinationuid"]]
     assert shown["type"] == "alfred.workflow.output.largetype", "which prints into Large Type"
+
+
+def test_a_reminder_row_previews_into_large_type_and_retypes_into_t(plist, objects):
+    cond = next(o for o in objects.values() if o["type"] == "alfred.workflow.utility.conditional")
+    outputs = {c["matchstring"]: c["uid"] for c in cond["config"]["conditions"]}
+    links = {
+        link.get("sourceoutputuid"): objects[link["destinationuid"]]
+        for link in plist["connections"][cond["uid"]]
+    }
+    assert links[outputs["preview"]]["type"] == "alfred.workflow.output.largetype", "↩ shows it"
+    assert links[outputs["retype"]]["config"]["keyword"] == "t", "⌃↩ types it back into t"

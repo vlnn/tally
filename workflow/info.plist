@@ -102,6 +102,30 @@
 			</dict>
 			<dict>
 				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C14</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C15</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C02</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C16</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
 				<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C04</string>
 				<key>modifiers</key>
 				<integer>0</integer>
@@ -608,6 +632,34 @@
 						<key>uid</key>
 						<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C11</string>
 					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string>{var:action}</string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>preview</string>
+						<key>outputlabel</key>
+						<string>preview</string>
+						<key>uid</key>
+						<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C15</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string>{var:action}</string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>retype</string>
+						<key>outputlabel</key>
+						<string>retype</string>
+						<key>uid</key>
+						<string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C16</string>
+					</dict>
 				</array>
 				<key>elselabel</key>
 				<string>act</string>
@@ -866,7 +918,8 @@ t st ↩        stop (any command word works from two letters: to, yes, we, la, 
               on Today: tag the whole day. ⌘↩ opens it with delete typed in.
 t undo        take the last edit back
 t +15m stop   a reminder in big letters: +15, +15 min, +1h30m, +30s, 21:00, 9pm, then the text
-              pending ones are listed in t; ↩ on one cancels it
+              t daily 9:00 …, t weekdays 18:30 …, t mon,thu 19:00 …, t every 45m … until 18:00
+              @reminders lists them: ↩ shows now, ⌥↩ skips/cancels, ⇧↩ stops all, ⌃↩ edits
 t nudge       turn nudges on or off: every 15 min, a notification you can ignore
 The second hotkey stops the running task without opening Alfred: give it a key.
 </string>

@@ -1,27 +1,29 @@
-"""Reminders: a time first, then what to be reminded of, shown in Large Type when it comes.
+"""Reminders: a time or a repeat first, then what to be reminded of, in Large Type when due.
 
-Each reminder is a row in the database and a one-shot launchd agent whose calendar time is
-the reminder's minute. The agent asks Alfred to run the workflow's `remind` trigger with the
-reminder's id; the workflow prints its text into Large Type and removes the agent.
+Each reminder is a row in the database and a launchd agent. A one-shot agent fires once at
+the reminder's minute; a repeating one fires on its calendar or every so long. The agent asks
+Alfred to run the workflow's `remind` trigger with the reminder's id; the workflow prints its
+text into Large Type, moves a repeat on to its next firing, and removes a finished agent.
 """
 
 from __future__ import annotations
 
 import os
 import plistlib
-import re
 import sqlite3
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
-from tally import durations
+from hoard.alfred import fold
+
+from tally import durations, repeats
 from tally.nudge import BUNDLE_ID, domain, launchctl
+from tally.repeats import ONCE, Rule, next_at, wall
 
 TRIGGER = "remind"
 PREFIX = "com.anokhin.tally.remind"
-CLOCK = re.compile(r"^(\d{1,2}):(\d{2})$")
-MERIDIEM = re.compile(r"^(\d{1,2})(?::(\d{2}))?(am|pm)$", re.IGNORECASE)
+SOON = timedelta(hours=1)
 
 SCHEMA = """
 create table if not exists reminders (
@@ -31,12 +33,20 @@ create table if not exists reminders (
     state text not null default 'pending'
 );
 """
+COLUMNS = {
+    "typed": "text not null default ''",
+    "rule": "text not null default ''",
+    "until": "text",
+    "skip": "integer not null default 0",
+}
 
 
 class Wanted(NamedTuple):
     at: datetime | None
     text: str
     problem: str = ""
+    rule: Rule = ONCE
+    until: datetime | None = None
 
 
 def relative(words: list[str], now: datetime) -> tuple[datetime, int] | None:
@@ -51,26 +61,6 @@ def relative(words: list[str], now: datetime) -> tuple[datetime, int] | None:
     return (at if found.seconds else at.replace(second=0)), found.taken
 
 
-def clock(hour: int, minute: int) -> time | None:
-    return time(hour, minute) if hour < 24 and minute < 60 else None
-
-
-def wall(word: str) -> time | None:
-    found = CLOCK.match(word)
-    if found:
-        return clock(int(found.group(1)), int(found.group(2)))
-    found = MERIDIEM.match(word)
-    if not found or not 1 <= int(found.group(1)) <= 12:
-        return None
-    hour = int(found.group(1)) % 12 + (12 if found.group(3).lower() == "pm" else 0)
-    return clock(hour, int(found.group(2) or 0))
-
-
-def next_at(moment: time, now: datetime) -> datetime:
-    today = datetime.combine(now.date(), moment)
-    return today if today > now else today + timedelta(days=1)
-
-
 def when(words: list[str], now: datetime) -> tuple[datetime, int] | None:
     found = relative(words, now)
     if found:
@@ -79,23 +69,42 @@ def when(words: list[str], now: datetime) -> tuple[datetime, int] | None:
     return (next_at(moment, now), 1) if moment else None
 
 
+def ends(words: list[str], now: datetime) -> tuple[datetime, list[str]] | None:
+    """A trailing `until 18:00`, `until fri`, `until 2026-11-30`, and the words before it."""
+    if len(words) < 3 or words[-2].lower() != "until":
+        return None
+    found = repeats.ending(words[-1], now)
+    return (found, words[:-2]) if found else None
+
+
 def wanted(text: str, now: datetime) -> Wanted | None:
-    """A reminder when the text starts with a time to come, otherwise None."""
+    """A reminder when the text starts with a time to come or a repeat, otherwise None."""
     words = text.split()
     if not words:
         return None
-    found = when(words, now)
-    if found is None:
-        return None
-    at, taken = found
-    rest = " ".join(words[taken:])
+    repeat = repeats.parse(words, now)
+    if repeat:
+        rule, at, taken = repeat
+    else:
+        found = when(words, now)
+        if found is None:
+            return None
+        (at, taken), rule = found, ONCE
+    rest = words[taken:]
+    finish = ends(rest, now) if rule.repeats else None
+    if finish:
+        rest = finish[1]
     if not rest:
-        return Wanted(at, "", "Type what to remind you of after the time")
-    return Wanted(at, rest)
+        return Wanted(at, "", "Type what to remind you of after the time", rule)
+    return Wanted(at, " ".join(rest), "", rule, finish[0] if finish else None)
 
 
 def connect(db: sqlite3.Connection) -> sqlite3.Connection:
     db.executescript(SCHEMA)
+    have = {row[1] for row in db.execute("pragma table_info(reminders)")}
+    for name, kind in COLUMNS.items():
+        if name not in have:
+            db.execute(f"alter table reminders add column {name} {kind}")
     return db
 
 
@@ -103,15 +112,40 @@ class Reminder(NamedTuple):
     id: int
     at: datetime
     text: str
+    rule: Rule = ONCE
+    until: datetime | None = None
+    typed: str = ""
+    skip: bool = False
 
 
-def add(db: sqlite3.Connection, at: datetime, text: str) -> Reminder:
+FIELDS = "id, at, text, rule, until, typed, skip"
+
+
+def read(row: tuple) -> Reminder:
+    identity, at, text, rule, until, typed, skip = row
+    ending = datetime.fromisoformat(until) if until else None
+    return Reminder(
+        identity, datetime.fromisoformat(at), text, repeats.decode(rule), ending, typed, bool(skip)
+    )
+
+
+def add(db: sqlite3.Connection, chosen: Wanted, typed: str) -> Reminder:
+    assert chosen.at is not None
     connect(db)
     with db:
         cursor = db.execute(
-            "insert into reminders (at, text) values (?, ?)", (exact(at), text.strip())
+            "insert into reminders (at, text, rule, until, typed) values (?, ?, ?, ?, ?)",
+            (
+                exact(chosen.at),
+                chosen.text.strip(),
+                repeats.encode(chosen.rule),
+                exact(chosen.until) if chosen.until else None,
+                typed.strip(),
+            ),
         )
-    return Reminder(cursor.lastrowid or 0, at, text.strip())
+    return Reminder(
+        cursor.lastrowid or 0, chosen.at, chosen.text.strip(), chosen.rule, chosen.until, typed
+    )
 
 
 def exact(at: datetime) -> str:
@@ -121,20 +155,56 @@ def exact(at: datetime) -> str:
 def pending(db: sqlite3.Connection) -> list[Reminder]:
     connect(db)
     rows = db.execute(
-        "select id, at, text from reminders where state = 'pending' order by at, id"
+        f"select {FIELDS} from reminders where state = 'pending' order by at, id"
     ).fetchall()
-    return [Reminder(i, datetime.fromisoformat(at), text) for i, at, text in rows]
+    return [read(row) for row in rows]
 
 
 def find(db: sqlite3.Connection, identity: int) -> Reminder | None:
     connect(db)
-    row = db.execute("select id, at, text from reminders where id = ?", (identity,)).fetchone()
-    return Reminder(row[0], datetime.fromisoformat(row[1]), row[2]) if row else None
+    row = db.execute(f"select {FIELDS} from reminders where id = ?", (identity,)).fetchone()
+    return read(row) if row else None
 
 
 def settle(db: sqlite3.Connection, identity: int, state: str) -> None:
     with db:
         db.execute("update reminders set state = ? where id = ?", (state, identity))
+
+
+def move(db: sqlite3.Connection, identity: int, at: datetime, skip: bool = False) -> None:
+    with db:
+        db.execute(
+            "update reminders set at = ?, skip = ? where id = ?", (exact(at), int(skip), identity)
+        )
+
+
+def soon(chosen: Reminder, now: datetime) -> bool:
+    return not chosen.rule.repeats or chosen.at - now <= SOON
+
+
+def same_text(db: sqlite3.Connection, text: str) -> list[Reminder]:
+    return [r for r in pending(db) if fold(r.text) == fold(text)]
+
+
+def finish(db: sqlite3.Connection, chosen: Reminder, state: str) -> None:
+    unschedule(chosen.id)
+    settle(db, chosen.id, state)
+
+
+def fire(db: sqlite3.Connection, chosen: Reminder, now: datetime) -> str:
+    """What to show when the agent fires, if anything, after moving the reminder on."""
+    if chosen.until and now >= chosen.until:
+        finish(db, chosen, "done")
+        return ""
+    if not chosen.rule.repeats:
+        finish(db, chosen, "shown")
+        return chosen.text
+    coming = repeats.next_after(chosen.rule, chosen.at, now)
+    if chosen.until and coming >= chosen.until:
+        finish(db, chosen, "done")
+    else:
+        move(db, chosen.id, coming)
+    return "" if chosen.skip else chosen.text
 
 
 def label(identity: int) -> str:
@@ -151,6 +221,8 @@ def agent_path(identity: int) -> Path:
 
 def when_to_run(chosen: Reminder, now: datetime) -> dict:
     """A calendar minute, which launchd keeps across sleep; seconds need a countdown instead."""
+    if chosen.rule.repeats:
+        return repeats.launchd(chosen.rule, chosen.at)
     if chosen.at.second:
         return {"StartInterval": max(1, int((chosen.at - now).total_seconds()))}
     at = chosen.at
@@ -199,6 +271,16 @@ def until(at: datetime, now: datetime) -> str:
     if minutes < 60:
         return f"in {minutes} min"
     return f"in {minutes // 60}:{minutes % 60:02d}"
+
+
+def timing(chosen: Reminder | Wanted, now: datetime) -> str:
+    """`21:00`, `daily 09:00`, `mon, thu 19:00`, `every 45 min`."""
+    assert chosen.at is not None
+    if chosen.rule.kind == "every":
+        return repeats.describe(chosen.rule)
+    if chosen.rule.repeats:
+        return f"{repeats.describe(chosen.rule)} {chosen.at:%H:%M}"
+    return spoken(chosen.at, now)
 
 
 def spoken(at: datetime, now: datetime) -> str:

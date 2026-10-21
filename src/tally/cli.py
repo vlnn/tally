@@ -73,7 +73,16 @@ def say(text: str) -> int:
 def listed(text: str, ctx: Context, chosen: scope.Scope) -> int:
     plugin = lambda: bar.plugin_path(ctx.env)  # noqa: E731
     nudges = lambda: (nudge.installed(), nudge.describe(nudge.settings(ctx.env)))  # noqa: E731
-    return emit(present.rows(text, ctx.db, ctx.now, ctx.starts, plugin, nudges, chosen))
+    replacing = replaced(ctx)
+    found = present.rows(text, ctx.db, ctx.now, ctx.starts, plugin, nudges, chosen, replacing)
+    return emit(found)
+
+
+def replaced(ctx: Context) -> remind.Reminder | None:
+    """The reminder ⌃↩ came from, while its text is being retyped."""
+    chosen = ctx.env.get("replace", "").strip()
+    found = remind.find(ctx.db, int(chosen)) if chosen.isdigit() else None
+    return found if found and found in remind.pending(ctx.db) else None
 
 
 def filter_command(args: list[str], ctx: Context) -> int:
@@ -181,34 +190,60 @@ def undo_command(args: list[str], ctx: Context) -> int:
 
 
 def remember_command(args: list[str], ctx: Context) -> int:
-    chosen = remind.wanted(" ".join(args), ctx.now)
+    typed = " ".join(args)
+    chosen = remind.wanted(typed, ctx.now)
     if chosen is None or chosen.problem or chosen.at is None:
-        raise Usage("remember needs a time first, then the text")
-    added = remind.add(ctx.db, chosen.at, chosen.text)
+        raise Usage("remember needs a time or a repeat first, then the text")
+    old = replaced(ctx)
+    if old:
+        remind.finish(ctx.db, old, "replaced")
+    added = remind.add(ctx.db, chosen, typed)
     remind.schedule(added, ctx.now)
     bar.poke(ctx.env)
-    return say(f"Reminder set for {remind.spoken(added.at, ctx.now)}: {added.text}")
+    verb = "Replaced with" if old else "Reminder set for"
+    return say(f"{verb} {remind.timing(added, ctx.now)}: {added.text}")
+
+
+def reminder(args: list[str], ctx: Context) -> remind.Reminder | None:
+    chosen = args[0].strip() if args else ""
+    return remind.find(ctx.db, int(chosen)) if chosen.isdigit() else None
 
 
 def forget_command(args: list[str], ctx: Context) -> int:
-    found = remind.find(ctx.db, int(args[0])) if args and args[0].isdigit() else None
+    """Cancel a one-shot reminder; for a repeat, skip only its next firing."""
+    found = reminder(args, ctx)
     if found is None:
         return say("No such reminder")
-    remind.unschedule(found.id)
-    remind.settle(ctx.db, found.id, "cancelled")
+    if found.rule.repeats:
+        remind.move(ctx.db, found.id, found.at, skip=True)
+        return say(f"Skipping {remind.spoken(found.at, ctx.now)}: {found.text}")
+    remind.finish(ctx.db, found, "cancelled")
     return say(f"Cancelled: {found.text}")
 
 
-def remind_command(args: list[str], ctx: Context) -> int:
-    """Runs when a reminder's agent fires: its text for Large Type, and it is done."""
-    found = remind.find(ctx.db, int(args[0])) if args and args[0].strip().isdigit() else None
+def forget_all_command(args: list[str], ctx: Context) -> int:
+    """Stop every pending reminder with this one's text, repeating or not."""
+    found = reminder(args, ctx)
     if found is None:
+        return say("No such reminder")
+    stopped = remind.same_text(ctx.db, found.text)
+    for each in stopped:
+        remind.finish(ctx.db, each, "cancelled")
+    count = "1 reminder" if len(stopped) == 1 else f"{len(stopped)} reminders"
+    return say(f"Stopped {count}: {found.text}")
+
+
+def remind_command(args: list[str], ctx: Context) -> int:
+    """Runs when a reminder's agent fires: its text for Large Type, and the schedule moves on."""
+    found = reminder(args, ctx)
+    if found is None or found not in remind.pending(ctx.db):
         return 0
-    remind.unschedule(found.id)
-    remind.settle(ctx.db, found.id, "shown")
+    shown = remind.fire(ctx.db, found, ctx.now)
+    if not shown:
+        return 0
     if bar.installed(ctx.env):
-        bar.notify(found.text, nudge.opening(ctx.db, ctx.now))
-    return say(found.text)
+        bar.notify(shown, nudge.link(f"@reminders {shown}"))
+    return say(shown)
 
 
 def act_command(args: list[str], ctx: Context) -> int:
@@ -243,6 +278,7 @@ ACTIONS: dict[str, Command] = {
     "undo": undo_command,
     "remember": remember_command,
     "forget": forget_command,
+    "forget-all": forget_all_command,
 }
 
 COMMANDS: dict[str, Command] = {

@@ -147,9 +147,9 @@ def test_pending_reminders_are_listed_and_cancelled(run, db, agents, sample, tmp
     run("act", "remember", "21:00 stand up")
     rows = present.rows("", db, NOW, NO_OFFSET)
     row = next(r for r in rows if r["title"].startswith("⏰"))
-    assert (row["title"], row["subtitle"]) == ("⏰ 21:00 stand up", "in 6:00 · ↩ cancels it")
+    assert (row["title"], row["subtitle"]) == ("⏰ 21:00 stand up", "in 6:00 · ↩ shows it now")
     assert [r["title"] for r in rows][-1] == "Today", "above Today"
-    _code, out = run("act", "forget", row["arg"])
+    _code, out = run("act", "forget", row["mods"]["alt"]["arg"])
     assert out.strip() == "Cancelled: stand up" and remind.pending(db) == [], "gone"
     assert not (tmp_path / "com.anokhin.tally.remind.1.plist").exists(), "and so is its agent"
 

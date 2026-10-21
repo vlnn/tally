@@ -287,26 +287,100 @@ def undo_row(db: sqlite3.Connection) -> Row:
     }
 
 
-def reminder_row(text: str, chosen: remind.Wanted, now: datetime) -> Row:
+def reminder_row(
+    text: str, chosen: remind.Wanted, now: datetime, replacing: remind.Reminder | None = None
+) -> Row:
     if chosen.problem or chosen.at is None:
         return {"title": chosen.problem, "subtitle": "", "valid": False, "mods": NO_MODS}
+    verb = "Replace with" if replacing else "Remind"
+    first = "" if not chosen.rule.repeats else f"first {remind.spoken(chosen.at, now)}, "
+    ending = f" · until {remind.spoken(chosen.until, now)}" if chosen.until else ""
+    instead = f" · instead of {replacing.text}" if replacing else ""
     return {
-        "title": f"Remind {remind.spoken(chosen.at, now)}: {chosen.text}",
-        "subtitle": f"{remind.until(chosen.at, now)} · in big letters then · ↩ sets it",
+        "title": f"{verb} {remind.timing(chosen, now)}: {chosen.text}",
+        "subtitle": f"{first}{remind.until(chosen.at, now)}{ending}{instead}"
+        " · in big letters then · ↩ sets it",
         "arg": text,
         "variables": {"action": "remember"},
         "mods": NO_MODS,
     }
 
 
-def pending_row(chosen: remind.Reminder, now: datetime) -> Row:
+def reminder_mods(chosen: remind.Reminder) -> dict[str, Mod]:
+    one = "skip the next one, keep the rest" if chosen.rule.repeats else "cancel it"
     return {
-        "title": f"⏰ {remind.spoken(chosen.at, now)} {chosen.text}",
-        "subtitle": f"{remind.until(chosen.at, now)} · ↩ cancels it",
-        "arg": str(chosen.id),
-        "variables": {"action": "forget"},
+        **NO_MODS,
+        "alt": {"arg": str(chosen.id), "subtitle": f"⌥↩ {one}", "variables": {"action": "forget"}},
+        "shift": {
+            "arg": str(chosen.id),
+            "subtitle": f"⇧↩ stop every reminder of “{chosen.text}”",
+            "variables": {"action": "forget-all"},
+        },
+        "ctrl": {
+            "arg": chosen.typed or chosen.text,
+            "subtitle": "⌃↩ edit: what you typed, back in the list",
+            "variables": {"action": "retype", "replace": str(chosen.id)},
+        },
+    }
+
+
+def pending_row(chosen: remind.Reminder, now: datetime) -> Row:
+    parts = [remind.until(chosen.at, now)]
+    if chosen.rule.repeats:
+        parts.insert(0, f"next {remind.spoken(chosen.at, now)}")
+    if chosen.skip:
+        parts.append("skipping that one")
+    if chosen.until:
+        parts.append(f"until {remind.spoken(chosen.until, now)}")
+    return {
+        "title": f"⏰ {remind.timing(chosen, now)} {chosen.text}",
+        "subtitle": " · ".join([*parts, "↩ shows it now"]),
+        "arg": chosen.text,
+        "variables": {"action": "preview"},
+        "mods": reminder_mods(chosen),
+    }
+
+
+REMINDERS = "reminders"
+
+
+def asks_for_reminders(words: list[str]) -> bool:
+    first = words[0]
+    wanted = first[1:].lower()
+    return (
+        first.startswith("@") and len(wanted) >= commands.MIN_TYPED and REMINDERS.startswith(wanted)
+    )
+
+
+def reminder_rows(words: list[str], db: sqlite3.Connection, now: datetime) -> list[Row]:
+    wanted = " ".join(words)
+    found = [r for r in remind.pending(db) if matches(wanted, r.text)]
+    if not found:
+        return [
+            {
+                "title": "No reminders",
+                "subtitle": "t +15m …, t 21:00 …, t daily 9:00 …, t every 45m …",
+                "valid": False,
+                "mods": NO_MODS,
+            }
+        ]
+    return [pending_row(r, now) for r in found]
+
+
+def at_words_rows(db: sqlite3.Connection, now: datetime, starts: timedelta) -> list[Row]:
+    viewed = [
+        view_row(days.asked(word, now, starts), db, now, starts, word)  # type: ignore[arg-type]
+        for word in ("@today", "@yesterday", "@week", "@lastweek", "@month", "@lastmonth")
+    ]
+    count = len(remind.pending(db))
+    listing: Row = {
+        "title": "Reminders",
+        "subtitle": f"{count} pending · ⇥ lists them",
+        "valid": False,
+        "autocomplete": "@reminders ",
         "mods": NO_MODS,
     }
+    return [*viewed, listing]
 
 
 def recent(db: sqlite3.Connection, now: datetime, scope: Scope = EVERYTHING) -> list[store.Task]:
@@ -328,7 +402,7 @@ def bare_rows(
     active = store.running(db, now)
     if active:
         shown.append(stop_row(active, now))
-    shown += [pending_row(r, now) for r in remind.pending(db)]
+    shown += [pending_row(r, now) for r in remind.pending(db) if remind.soon(r, now)]
     return [*shown, view_row(day.window, db, now, starts, "@today", scope)]
 
 
@@ -423,15 +497,20 @@ def rows(
     plugin: Callable[[], Path | None] = lambda: None,
     nudges: Callable[[], tuple[bool, str]] = lambda: (False, ""),
     scope: Scope = EVERYTHING,
+    replacing: remind.Reminder | None = None,
 ) -> list[Row]:
     words = text.split()
     if not words:
         return bare_rows(db, now, starts, scope)
+    if words == ["@"]:
+        return at_words_rows(db, now, starts)
+    if asks_for_reminders(words):
+        return reminder_rows(words[1:], db, now)
     if len(words) == 1 and days.DATE.match(words[0]):
         return date_rows(words[0], db, now, starts)
     later = remind.wanted(text, now)
     if later:
-        return [reminder_row(text, later, now)]
+        return [reminder_row(text, later, now, replacing)]
     found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]
     if text.lstrip().startswith("@"):
         return found or [unknown_day_row(words[0])]

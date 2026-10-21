@@ -96,13 +96,17 @@ OPEN_TRIGGER = "open"
 CLICK = "Click to switch."
 
 
-def opening(db: sqlite3.Connection, now: datetime) -> str:
-    """The Alfred link a click follows: t, with the running task typed in so it is on top."""
+def link(typed: str) -> str:
+    """An Alfred link that opens t with this typed in."""
     from urllib.parse import quote
 
+    return f"alfred://runtrigger/{BUNDLE_ID}/{OPEN_TRIGGER}/?argument={quote(typed)}"
+
+
+def opening(db: sqlite3.Connection, now: datetime) -> str:
+    """The link a nudge's click follows: t, with the running task typed in so it is on top."""
     active = store.running(db, now)
-    typed = quote(active.line) if active else ""
-    return f"alfred://runtrigger/{BUNDLE_ID}/{OPEN_TRIGGER}/?argument={typed}"
+    return link(active.line if active else "")
 
 
 HID_IDLE = re.compile(r'"HIDIdleTime"\s*=\s*(\d+)')

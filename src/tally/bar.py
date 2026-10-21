@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from tally import present, store
+from tally import present, remind, store
 
 PLUGIN = "tally.30s.sh"
 IDLE = "tally"
@@ -62,6 +62,14 @@ def menu(db: sqlite3.Connection, now: datetime, starts: timedelta, plugin: str) 
     for task in present.recent(db, now):
         subtitle = present.task_subtitle(task, day, db, now)
         lines.append(action(f"Resume {task.line} · {subtitle}", plugin, "start", task.line))
+    waiting = remind.pending(db)
+    if waiting:
+        lines += ["---", f"Reminders · {len(waiting)}"]
+        lines += [
+            "--"
+            + action(f"⏰ {remind.timing(r, now)} {r.text}", plugin, "open", f"@reminders {r.text}")
+            for r in waiting
+        ]
     lines += [
         "---",
         action(f"Today · {present.hm(day.total())} logged", plugin, "open", "@today"),

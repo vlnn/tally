@@ -18,6 +18,7 @@ data folder) and nothing of the kernel.
 | `journal`   | edits as batches of ops on transitions, each batch's before-image, undo | a new kind of op |
 | `edits`     | what text typed in the edit list means for a block, a task or a day; refusals | a new edit word |
 | `editrows`  | the edit list's rows: hints, the planned change, the refusal | the edit list shows something new |
+| `repeats`   | a reminder's repeat rule: read, next firing, wording, launchd schedule, `until` | a new kind of repeat |
 | `remind`    | reading a reminder's time, the reminders table, one launchd agent per reminder | a repeating reminder |
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
@@ -115,6 +116,18 @@ only the last counts, a transition repeating the task before it (or a stop after
 stop before anything) is dropped. `store.record` deletes them after each insert; `journal.apply`
 deletes them inside its batch, so undo brings them back with the rest. Old data is tidied by
 the next write, whatever it is.
+
+## Repeating reminders
+
+A reminder row keeps `rule` (`daily`, `days:0,3`, `every:2700`, empty for once), `until`,
+`typed` (what was typed, for ⌃↩) and `skip`; old databases get the columns on connect. A
+repeat's agent never changes: launchd's calendar (`Weekday` 0 is Sunday) or `StartInterval`.
+What changes is the row: `remind.fire` decides at each firing whether to show (not when
+skipped), moves `at` to the next firing after now (so a firing caught up on wake does not
+replay the missed ones), and ends the series once `until` is reached. ↩ on a ⏰ row goes from
+the action conditional straight to Large Type with the text as its argument, so a preview
+never touches the database. ⌃↩ goes back into `t` with the typed text as its argument and
+`replace` as a variable; `remember` finishes the old reminder before adding the new one.
 
 ## Deliberately not here
 

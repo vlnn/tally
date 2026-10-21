@@ -102,13 +102,46 @@ lands on the minute and survives sleep; with seconds it is a countdown to the se
 launchd can miss if the Mac sleeps through it; `21:00`, `9pm`, `9:30PM` are today, or tomorrow when
 already past. At that minute Alfred shows the text in Large Type across the screen; with the
 SwiftBar plugin a clickable notification stays behind too. If the Mac sleeps through it, it
-shows on wake. Pending reminders are listed in bare `t` (`⏰ 21:00 stand up · in 6:00`), and ↩
-on one cancels it.
+shows on wake.
+
+### Repeating
+
+A repeat word with a time after it makes a repeating reminder; without the time it is still a
+task (`t daily standup` starts one):
+
+```
+t daily 9:00 standup                 Remind daily 09:00: standup
+t weekdays 18:30 stop the work       Remind weekdays 18:30: stop the work
+t weekends 10:00 call mum
+t mon,thu 19:00 gym                  also mon+thu, mon thu, monday, wed
+t every 45m drink water              every 2h, every 90 min, every 90, every 30s
+t every 45m drink water until 18:00  until a time, a day (fri) or a date (2026-11-30)
+```
+
+`until` means the nearest coming one: `until 18:00` is today's if still ahead, else tomorrow's;
+`until fri` is the end of the coming Friday. Without it a repeat runs until stopped. Daily and
+weekday repeats fire on the clock and catch up on wake; `every` counts from when it was set,
+round the clock, and skips what falls in sleep.
+
+### The list and its keys
+
+`@reminders` (from `@re`) lists every pending reminder, next first; words after it narrow the
+list. Bare `t` lists one-shot reminders and repeats due within the hour. Bare `@` lists every
+@word. The SwiftBar menu has a Reminders submenu, and clicking a reminder's notification or a
+menu entry opens `@reminders` with it on top. On a ⏰ row:
+
+| Key | Does |
+| --- | --- |
+| ↩   | show it now in Large Type, a test; the schedule is untouched |
+| ⌥↩  | cancel it; for a repeat, skip only the next firing |
+| ⇧↩  | stop every pending reminder with this text |
+| ⌃↩  | edit: what you typed comes back into `t`, and ↩ on the Replace row swaps it in |
 
 A time **last** is still a backfill (`t standup 9:30`), so a time in the future there says to put
-it first. Underneath, each reminder is a row in the database and a one-shot launchd agent
+it first. Underneath, each reminder is a row in the database and a launchd agent
 (`~/Library/LaunchAgents/com.anokhin.tally.remind.<id>.plist`) that asks Alfred to run the
-workflow's `remind` trigger; it removes itself when it fires or is cancelled.
+workflow's `remind` trigger: once, on its calendar, or every so long. It removes itself when a
+one-shot fires, when a repeat ends, and when either is cancelled.
 
 ## Nudges
 
@@ -143,7 +176,7 @@ say yes.
 
 The first two letters of a command's name put its row above everything else, so `t st`,
 `t to`, `t yes`, `t we`, `t la` and `t mo` reach Stop, Today, Yesterday, This week, Last week
-and Last month, `t ba` the SwiftBar plugin, `t nu` the nudges and `t un` undo. The Start row for what you typed and the
+and Last month, `t ba` the SwiftBar plugin, `t nu` the nudges and `t un` undo. `@re` lists reminders. The Start row for what you typed and the
 matching tasks stay below, so typing on to `t standup` still finds it. With a leading `@`
 (`@today`, `@week`) only the views are listed.
 
