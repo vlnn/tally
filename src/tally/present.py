@@ -10,7 +10,8 @@ from typing import TypedDict
 
 from hoard.alfred import matches
 
-from tally import commands, days, journal, remind, store, timewords
+from tally import commands, days, gaps, journal, remind, store, timewords
+from tally.durations import hm
 from tally.scope import Scope
 
 EVERYTHING = Scope()
@@ -40,11 +41,6 @@ class Row(TypedDict, total=False):
 NO_MODS: dict[str, Mod] = {
     mod: {"valid": False, "subtitle": ""} for mod in ("shift", "alt", "cmd", "ctrl")
 }
-
-
-def hm(span: timedelta) -> str:
-    minutes = int(span.total_seconds() // 60)
-    return f"{minutes // 60}:{minutes % 60:02d}"
 
 
 def when(moment: datetime, now: datetime) -> str:
@@ -93,13 +89,14 @@ def start_variables(at: datetime | None) -> dict[str, str]:
     return variables
 
 
-def gap_mod(db: sqlite3.Connection, now: datetime) -> Mod:
+def gap_mod(db: sqlite3.Connection, now: datetime, claim: gaps.Claim | None = None) -> Mod:
     last = store.last_before(db, now)
     if last is None or not last.stop:
         return {"valid": False, "subtitle": "⇧↩ nothing to fill: a task is running"}
+    since = claim.gap.start if claim else last.at
     return {
-        "subtitle": f"⇧↩ since {last.at:%H:%M} (fills {hm(now - last.at)})",
-        "variables": start_variables(last.at),
+        "subtitle": f"⇧↩ since {since:%H:%M} (fills {hm(now - since)})",
+        "variables": start_variables(since),
     }
 
 
@@ -110,8 +107,10 @@ def stop_mod(db: sqlite3.Connection, now: datetime) -> Mod:
     return stop_mod_for(active, now)
 
 
-def task_mods(db: sqlite3.Connection, now: datetime, fill: bool = True) -> dict[str, Mod]:
-    shift = gap_mod(db, now) if fill else NO_MODS["shift"]
+def task_mods(
+    db: sqlite3.Connection, now: datetime, fill: bool = True, claim: gaps.Claim | None = None
+) -> dict[str, Mod]:
+    shift = gap_mod(db, now, claim) if fill else NO_MODS["shift"]
     return {**NO_MODS, "shift": shift, "alt": stop_mod(db, now)}
 
 
@@ -133,14 +132,20 @@ def task_edit_mods(line: str) -> dict[str, Mod]:
     return edit_mods(f"task:{line}", "rename or retag this task")
 
 
-def resume_row(task: store.Task, day: Day, db: sqlite3.Connection, now: datetime) -> Row:
+def resume_row(
+    task: store.Task,
+    day: Day,
+    db: sqlite3.Connection,
+    now: datetime,
+    claim: gaps.Claim | None = None,
+) -> Row:
     return {
         "title": f"Resume {task.line}",
         "subtitle": task_subtitle(task, day, db, now),
         "arg": task.line,
         "variables": start_variables(None),
         "text": {"copy": task.line, "largetype": task.line},
-        "mods": {**task_mods(db, now), **task_edit_mods(task.line)},
+        "mods": {**task_mods(db, now, claim=claim), **task_edit_mods(task.line)},
     }
 
 
@@ -155,12 +160,16 @@ def effect(at: datetime, db: sqlite3.Connection, now: datetime) -> str:
 
 
 def start_row(
-    typed: timewords.Typed, known: str | None, db: sqlite3.Connection, now: datetime
+    typed: timewords.Typed,
+    known: str | None,
+    db: sqlite3.Connection,
+    now: datetime,
+    claim: gaps.Claim | None = None,
 ) -> Row:
     line = known or typed.line
     verb = "Resume" if known else "Start"
     subtitle = effect(typed.at, db, now) if typed.at else "↩ from now"
-    mods = task_mods(db, now, fill=typed.at is None)
+    mods = task_mods(db, now, fill=typed.at is None, claim=claim)
     if known:
         mods = {**mods, **task_edit_mods(known)}
     return {
@@ -394,11 +403,74 @@ def recent(db: sqlite3.Connection, now: datetime, scope: Scope = EVERYTHING) -> 
     return others[:RECENT_LIMIT]
 
 
+def unclaimed_row(claim: gaps.Claim) -> Row:
+    gap = claim.gap
+    return {
+        "title": f"Unclaimed {hm(gap.length)} since {gap.start:%H:%M}",
+        "subtitle": "type what you are doing: it can start now, or since then",
+        "valid": False,
+        "mods": NO_MODS,
+    }
+
+
+def since_row(line: str, at: datetime, why: str, now: datetime, known: bool) -> Row:
+    verb = "Resume" if known else "Start"
+    return {
+        "title": f"{verb} {line} since {at:%H:%M}",
+        "subtitle": f"{why} · {hm(now - at)} · ↩ claims it, it keeps running",
+        "arg": line,
+        "variables": start_variables(at),
+        "text": {"copy": line, "largetype": line},
+        "mods": NO_MODS,
+    }
+
+
+def claim_rows(line: str, known: bool, claim: gaps.Claim, now: datetime) -> list[Row]:
+    """The two starts back in time the first task after a gap may really have had."""
+    woke = claim.woke()
+    found = [since_row(line, woke, "display on", now, known)] if woke else []
+    return [*found, since_row(line, claim.gap.start, "whole gap", now, known)]
+
+
+def split_row(text: str, claim: gaps.Claim | None, scope: Scope) -> Row:
+    parts = [p._replace(line=scope.apply(p.line)) for p in gaps.split(text) or []]
+    if claim is None:
+        return {
+            "title": "A split claims unclaimed time; nothing is unclaimed now",
+            "subtitle": "stop the running task first, or edit with ⌃↩",
+            "valid": False,
+            "mods": NO_MODS,
+        }
+    filled = gaps.fill(parts, claim.gap)
+    if filled.problem:
+        return {"title": filled.problem, "subtitle": "", "valid": False, "mods": NO_MODS}
+    ends = [*(at for at, _ in filled.starts[1:]), None]
+    said = ", ".join(
+        f"{line} {at:%H:%M}–{end:%H:%M}" if end else f"{line} from {at:%H:%M}"
+        for (at, line), end in zip(filled.starts, ends)
+    )
+    lengths = ", ".join(
+        f"{p.line} {int(p.length.total_seconds() // 60)}" if p.length else p.line for p in parts
+    )
+    return {
+        "title": f"Claim since {claim.gap.start:%H:%M}: {said}",
+        "subtitle": f"{hm(claim.gap.length)} · ↩ fills the gap, the last part keeps running",
+        "arg": lengths,
+        "variables": {"action": "claim"},
+        "mods": NO_MODS,
+    }
+
+
 def bare_rows(
-    db: sqlite3.Connection, now: datetime, starts: timedelta, scope: Scope = EVERYTHING
+    db: sqlite3.Connection,
+    now: datetime,
+    starts: timedelta,
+    scope: Scope = EVERYTHING,
+    claim: gaps.Claim | None = None,
 ) -> list[Row]:
     day = Day(db, now, starts)
-    shown = [resume_row(task, day, db, now) for task in recent(db, now, scope)]
+    shown = [unclaimed_row(claim)] if claim and claim.worth_asking else []
+    shown += [resume_row(task, day, db, now, claim) for task in recent(db, now, scope)]
     active = store.running(db, now)
     if active:
         shown.append(stop_row(active, now))
@@ -435,8 +507,15 @@ def is_running(line: str, active: store.Block | None, scope: Scope) -> bool:
 
 
 def typed_rows(
-    text: str, db: sqlite3.Connection, now: datetime, starts: timedelta, scope: Scope = EVERYTHING
+    text: str,
+    db: sqlite3.Connection,
+    now: datetime,
+    starts: timedelta,
+    scope: Scope = EVERYTHING,
+    claim: gaps.Claim | None = None,
 ) -> list[Row]:
+    if gaps.split(text):
+        return [split_row(text, claim, scope)]
     typed = timewords.parse(text, now)
     if typed.problem:
         return [invalid_row(typed)]
@@ -444,22 +523,24 @@ def typed_rows(
     day = Day(db, now, starts)
     found = store.tasks(db, datetime.min, now)
     active = store.running(db, now)
-    if typed.at is None and is_running(typed.line, active, scope):
-        assert active is not None
+    known = known_spelling(found, typed.line, scope)
+    if typed.at is None and active and is_running(typed.line, active, scope):
         top = running_row(active, now)
     else:
-        top = start_row(typed, known_spelling(found, typed.line, scope), db, now)
+        top = start_row(typed, known, db, now, claim)
+    asking = claim if claim and claim.worth_asking and typed.at is None and not active else None
+    backdated = claim_rows(known or typed.line, bool(known), asking, now) if asking else []
     wanted = timewords.parse(text, now).line
     similar = [
         running_row(active, now)
         if active and is_running(task.line, active, scope)
-        else resume_row(task, day, db, now)
+        else resume_row(task, day, db, now, claim)
         for task in found
         if scope.holds(task.line)
         and matches(wanted, task.line)
         and not scope.same(task.line, typed.line)
     ]
-    return [top, *similar]
+    return [top, *backdated, *similar]
 
 
 def command_row(
@@ -498,10 +579,11 @@ def rows(
     nudges: Callable[[], tuple[bool, str]] = lambda: (False, ""),
     scope: Scope = EVERYTHING,
     replacing: remind.Reminder | None = None,
+    claim: gaps.Claim | None = None,
 ) -> list[Row]:
     words = text.split()
     if not words:
-        return bare_rows(db, now, starts, scope)
+        return bare_rows(db, now, starts, scope, claim)
     if words == ["@"]:
         return at_words_rows(db, now, starts)
     if asks_for_reminders(words):
@@ -514,4 +596,4 @@ def rows(
     found = [command_row(c, db, now, starts, plugin, nudges) for c in commands.named(text)]
     if text.lstrip().startswith("@"):
         return found or [unknown_day_row(words[0])]
-    return [*found, *typed_rows(text, db, now, starts, scope)]
+    return [*found, *typed_rows(text, db, now, starts, scope, claim)]

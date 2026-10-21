@@ -50,3 +50,8 @@ def trailing(words: list[str], sign: str) -> Span | None:
         if found:
             return found._replace(taken=taken)
     return None
+
+
+def hm(span: timedelta) -> str:
+    minutes = int(span.total_seconds() // 60)
+    return f"{minutes // 60}:{minutes % 60:02d}"

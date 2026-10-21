@@ -921,6 +921,10 @@ t +15m stop   a reminder in big letters: +15, +15 min, +1h30m, +30s, 21:00, 9pm,
               t daily 9:00 …, t weekdays 18:30 …, t mon,thu 19:00 …, t every 45m … until 18:00
               @reminders lists them: ↩ shows now, ⌥↩ skips/cancels, ⇧↩ stops all, ⌃↩ edits
 t nudge       turn nudges on or off: every 15 min, a notification you can ignore
+Unclaimed     after 15 min with nothing running, t says so on top; typing a task offers it
+              from now, since the display came on, or since the gap began (⇧↩ too)
+t standup 30, api-design   split the gap: standup for 30 min from its start, then api-design
+              running on. With SwiftBar the counter climbs 15/30/45/60: grey, chime, notify
 The second hotkey stops the running task without opening Alfred: give it a key.
 </string>
 	<key>uidata</key>
@@ -1135,6 +1139,46 @@ The second hotkey stops the running task without opening Alfred: give it a key.
 			<string>checkbox</string>
 			<key>variable</key>
 			<string>nudge_weekends</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>15,30,45,60</string>
+				<key>placeholder</key>
+				<string>15,30,45,60</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Minutes of unclaimed time at which the SwiftBar counter shows (grey), chimes (yellow), notifies (orange) and notifies again (red). In t, an unclaimed gap is offered from the first one. Type t bar again after changing it.</string>
+			<key>label</key>
+			<string>Unclaimed ladder</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>unclaimed_ladder</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<true/>
+				<key>required</key>
+				<false/>
+				<key>text</key>
+				<string>Chime at the second step of the ladder</string>
+			</dict>
+			<key>description</key>
+			<string></string>
+			<key>label</key>
+			<string>Unclaimed sounds</string>
+			<key>type</key>
+			<string>checkbox</string>
+			<key>variable</key>
+			<string>unclaimed_sounds</string>
 		</dict>
 		<dict>
 			<key>config</key>

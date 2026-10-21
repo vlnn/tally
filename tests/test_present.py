@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from conftest import NO_OFFSET, NOW
-from tally import present
+from tally import gaps, present
+from tally.scope import Scope
 
 
 def titles(rows):
@@ -215,3 +216,97 @@ def test_a_leading_span_backfills(db, sample):
         "get scrubber from courier",
         {"action": "start", "at": "2026-10-20T14:50"},
     ), "-10m first means it started ten minutes ago, not a task called -10m"
+
+
+GAP_START = datetime(2026, 10, 20, 14, 30)
+
+
+@pytest.fixture
+def idle(db, logged):
+    logged(9, 0, "mail")
+    logged(14, 30, "")
+
+
+def claimed(start=GAP_START, woke=None):
+    return gaps.Claim(gaps.Gap(start, NOW), timedelta(minutes=15), lambda: woke)
+
+
+def test_bare_list_says_how_much_is_unclaimed(db, idle):
+    rows = present.bare_rows(db, NOW, NO_OFFSET, claim=claimed())
+    assert rows[0]["title"] == "Unclaimed 0:30 since 14:30", "the gap first, as a fact"
+    assert rows[0]["valid"] is False, "it is not a thing to press: type the task"
+
+
+def test_bare_list_keeps_quiet_about_short_gaps(db, idle):
+    rows = present.bare_rows(db, NOW, NO_OFFSET, claim=claimed(NOW - timedelta(minutes=10)))
+    assert not titles(rows)[0].startswith("Unclaimed"), "under the first step, nothing to say"
+
+
+def test_typed_task_after_a_gap_offers_three_starts(db, idle):
+    woke = datetime(2026, 10, 20, 14, 42)
+    rows = present.typed_rows("api-design", db, NOW, NO_OFFSET, claim=claimed(woke=woke))
+    assert titles(rows)[:3] == [
+        "Start api-design",
+        "Start api-design since 14:42",
+        "Start api-design since 14:30",
+    ], "now, since the display came on, since the gap began"
+    assert rows[0]["subtitle"] == "↩ from now", "↩ on the top row still means now"
+    assert rows[1]["subtitle"].startswith("display on · 0:18"), "why this time, and how long"
+    assert rows[2]["variables"]["at"] == "2026-10-20T14:30", "the whole gap starts at its start"
+
+
+def test_without_a_display_on_time_the_gap_is_the_only_alternative(db, idle):
+    rows = present.typed_rows("mail", db, NOW, NO_OFFSET, claim=claimed())
+    assert titles(rows)[:2] == ["Resume mail", "Resume mail since 14:30"], (
+        "a known task resumes, from now or from the start of the gap"
+    )
+
+
+@pytest.mark.parametrize("text", ["api-design 14:40", "api-design -10m"])
+def test_a_typed_time_needs_no_alternatives(db, idle, text):
+    rows = present.typed_rows(text, db, NOW, NO_OFFSET, claim=claimed())
+    assert not any("since" in title for title in titles(rows)), "the time is already chosen"
+
+
+def test_shift_fills_from_the_start_of_todays_gap(db, logged):
+    logged(16, 0, "mail", day=(NOW - timedelta(days=1)).date())
+    logged(17, 0, "", day=(NOW - timedelta(days=1)).date())
+    opening = datetime(2026, 10, 20, 9, 0)
+    rows = present.bare_rows(db, NOW, NO_OFFSET, claim=claimed(opening))
+    shift = rows[1]["mods"]["shift"]
+    assert shift["subtitle"] == "⇧↩ since 09:00 (fills 6:00)", (
+        "yesterday's stop is not today's gap: it opens with the hours"
+    )
+
+
+def test_a_split_claims_the_gap_in_parts(db, idle):
+    [row] = present.typed_rows(
+        "standup 10, mail 5, api-design", db, NOW, NO_OFFSET, claim=claimed()
+    )
+    assert row["title"] == (
+        "Claim since 14:30: standup 14:30–14:40, mail 14:40–14:45, api-design from 14:45"
+    ), "each part with its times, the last running on"
+    assert (row["arg"], row["variables"]) == (
+        "standup 10, mail 5, api-design",
+        {"action": "claim"},
+    ), "the act re-reads the parts"
+
+
+def test_a_split_in_the_work_list_tags_every_part(db, idle):
+    work = Scope("work", {})
+    [row] = present.typed_rows("standup 10, api", db, NOW, NO_OFFSET, work, claimed())
+    assert row["arg"] == "standup #work 10, api #work", "every part is work"
+
+
+def test_a_split_that_does_not_fit_says_so(db, idle):
+    [row] = present.typed_rows("standup 40, api", db, NOW, NO_OFFSET, claim=claimed())
+    assert (row["title"], row["valid"]) == ("0:40 of parts is more than the 0:30 gap", False), (
+        "one row, saying why"
+    )
+
+
+def test_a_split_with_nothing_unclaimed(db, sample):
+    [row] = present.typed_rows("standup 10, api", db, NOW, NO_OFFSET)
+    assert row["valid"] is False and row["title"].startswith("A split claims unclaimed time"), (
+        "with a task running there is no gap to split"
+    )

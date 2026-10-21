@@ -7,13 +7,28 @@ import sqlite3
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Callable
 
-from tally import present, remind, store
+from tally import gaps, present, remind, store
 
 PLUGIN = "tally.30s.sh"
+OPEN_T = "alfred://runtrigger/com.anokhin.tally/open/?argument="
 IDLE = "tally"
 WIDTH = 18
-PASSED = ("alfred_workflow_data", "db_path", "day_starts", "tag_aliases")
+PASSED = (
+    "alfred_workflow_data",
+    "db_path",
+    "day_starts",
+    "tag_aliases",
+    "nudge_every",
+    "nudge_hours",
+    "nudge_weekends",
+    "unclaimed_ladder",
+    "unclaimed_sounds",
+)
+COLOURS = ("#8E8E93", "#FFCC00", "#FF9500", "#FF3B30")
+CHIME = "/System/Library/Sounds/Tink.aiff"
+SOUNDED, TOLD = 2, 3
 
 SCRIPT = """#!/bin/bash
 # <swiftbar.hideAbout>true</swiftbar.hideAbout>
@@ -36,9 +51,73 @@ def shorten(line: str) -> str:
     return line if len(line) <= WIDTH else line[: WIDTH - 1].rstrip() + "…"
 
 
-def status(db: sqlite3.Connection, now: datetime) -> str:
+def status(
+    db: sqlite3.Connection,
+    now: datetime,
+    gap: gaps.Gap | None = None,
+    steps: tuple[int, ...] = gaps.DEFAULT_LADDER,
+) -> str:
     active = store.running(db, now)
-    return f"{shorten(active.line)} {present.hm(active.length(now))}" if active else IDLE
+    if active:
+        return f"{shorten(active.line)} {present.hm(active.length(now))}"
+    return unclaimed(gap, steps) or IDLE
+
+
+def unclaimed(gap: gaps.Gap | None, steps: tuple[int, ...]) -> str:
+    """The counter, coloured by how far up the ladder the gap is; nothing below the first step."""
+    reached = gaps.level(gap, steps)
+    if gap is None or not reached:
+        return ""
+    return f"{int(gap.length.total_seconds() // 60)}m unclaimed | color={COLOURS[reached - 1]}"
+
+
+def told(gap: gaps.Gap) -> str:
+    return f"{int(gap.length.total_seconds() // 60)} min unclaimed since {gap.start:%H:%M}"
+
+
+def climbed(db: sqlite3.Connection, gap: gaps.Gap | None, reached: int) -> bool:
+    """Whether this gap has just reached a step it had not reached before; remembers it."""
+    db.execute("CREATE TABLE IF NOT EXISTS ladder (start TEXT PRIMARY KEY, level INTEGER)")
+    if gap is None:
+        db.execute("DELETE FROM ladder")
+        db.commit()
+        return False
+    start = gap.start.isoformat(timespec="minutes")
+    db.execute("DELETE FROM ladder WHERE start != ?", (start,))
+    row = db.execute("SELECT level FROM ladder WHERE start = ?", (start,)).fetchone()
+    before = row[0] if row else 0
+    db.execute("INSERT OR REPLACE INTO ladder VALUES (?, ?)", (start, max(before, reached)))
+    db.commit()
+    return reached > before
+
+
+def chime() -> None:
+    import subprocess
+
+    try:
+        subprocess.Popen(["afplay", CHIME])
+    except FileNotFoundError:
+        pass
+
+
+def alert(
+    db: sqlite3.Connection,
+    gap: gaps.Gap | None,
+    steps: tuple[int, ...],
+    sounds: bool,
+    away: Callable[[], bool],
+) -> str:
+    """The sound at the second step, a notification at the third and fourth; not while away."""
+    reached = gaps.level(gap, steps)
+    if not climbed(db, gap, reached) or gap is None or reached < SOUNDED or away():
+        return ""
+    if reached >= TOLD:
+        notify(told(gap), OPEN_T)
+        return "told"
+    if sounds:
+        chime()
+        return "chimed"
+    return ""
 
 
 def quoted(text: str) -> str:
@@ -50,8 +129,18 @@ def action(title: str, plugin: str, *args: str) -> str:
     return f"{title} | bash={quoted(plugin)} {params} terminal=false refresh=true"
 
 
-def menu(db: sqlite3.Connection, now: datetime, starts: timedelta, plugin: str) -> str:
-    lines = [status(db, now), "---"]
+def menu(
+    db: sqlite3.Connection,
+    now: datetime,
+    starts: timedelta,
+    plugin: str,
+    gap: gaps.Gap | None = None,
+    steps: tuple[int, ...] = gaps.DEFAULT_LADDER,
+) -> str:
+    lines = [status(db, now, gap, steps), "---"]
+    if unclaimed(gap, steps):
+        assert gap is not None
+        lines += [action(f"Claim {told(gap)}", plugin, "open", ""), "---"]
     active = store.running(db, now)
     if active:
         lines += [

@@ -1,9 +1,10 @@
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from conftest import NO_OFFSET, NOW
-from tally import bar, cli, present
+from tally import bar, cli, gaps, nudge, present
 
 
 def test_status_is_the_running_task_and_its_time(db, sample):
@@ -191,3 +192,113 @@ def test_the_plugin_keeps_swiftbars_own_menu():
     text = bar.script({})
     assert "hideSwiftBar" not in text, "SwiftBar's submenu (preferences, refresh, quit) stays"
     assert "<swiftbar.hideAbout>true</swiftbar.hideAbout>" in text, "the rest stays tidy"
+
+
+def gap_of(minutes):
+    return gaps.Gap(NOW - timedelta(minutes=minutes), NOW)
+
+
+@pytest.mark.parametrize(
+    "minutes, expected",
+    [
+        (10, ""),
+        (15, "15m unclaimed | color=#8E8E93"),
+        (30, "30m unclaimed | color=#FFCC00"),
+        (45, "45m unclaimed | color=#FF9500"),
+        (95, "95m unclaimed | color=#FF3B30"),
+    ],
+)
+def test_unclaimed_counter_climbs_the_ladder(minutes, expected):
+    assert bar.unclaimed(gap_of(minutes), gaps.DEFAULT_LADDER) == expected, (
+        "grey, yellow, orange, red; nothing under the first step"
+    )
+
+
+def test_status_counts_unclaimed_time_when_idle(db, logged):
+    logged(9, 0, "mail")
+    logged(14, 30, "")
+    assert bar.status(db, NOW, gap_of(30)) == "30m unclaimed | color=#FFCC00", "the counter"
+
+
+def test_status_shows_the_running_task_over_any_gap(db, sample):
+    assert bar.status(db, NOW, gap_of(30)) == "parser #lexer 0:55", "running time is claimed"
+
+
+def test_menu_offers_to_claim(db, logged):
+    logged(9, 0, "mail")
+    logged(14, 30, "")
+    lines = bar.menu(db, NOW, NO_OFFSET, "/p/tally.30s.sh", gap_of(30)).splitlines()
+    assert lines[2].startswith("Claim 30 min unclaimed since 14:30 | "), "the claim opens t"
+    assert 'param1="open" param2=""' in lines[2], "bare t, where the gap is the top row"
+
+
+def never_away():
+    return False
+
+
+@pytest.mark.parametrize(
+    "minutes, sounds, said",
+    [
+        (15, True, ""),
+        (30, True, "chimed"),
+        (30, False, ""),
+        (45, True, "told"),
+        (60, False, "told"),
+    ],
+)
+def test_alert_on_reaching_a_step(db, mocker, minutes, sounds, said):
+    chime, notify = mocker.patch.object(bar, "chime"), mocker.patch.object(bar, "notify")
+    assert bar.alert(db, gap_of(minutes), gaps.DEFAULT_LADDER, sounds, never_away) == said, (
+        "a chime at the second step, a notification at the third and fourth"
+    )
+    assert chime.called is (said == "chimed") and notify.called is (said == "told"), "and only it"
+
+
+def test_alert_once_per_step(db, mocker):
+    mocker.patch.object(bar, "chime")
+    gap = gap_of(30)
+    first = bar.alert(db, gap, gaps.DEFAULT_LADDER, True, never_away)
+    again = bar.alert(
+        db, gaps.Gap(gap.start, NOW + timedelta(minutes=1)), (15, 30, 45, 60), True, never_away
+    )
+    assert (first, again) == ("chimed", ""), "the plugin runs every 30 s; a step rings once"
+
+
+def test_a_new_gap_starts_the_ladder_again(db, mocker):
+    mocker.patch.object(bar, "chime")
+    bar.alert(db, gap_of(30), gaps.DEFAULT_LADDER, True, never_away)
+    later = gaps.Gap(NOW, NOW + timedelta(minutes=30))
+    assert bar.alert(db, later, gaps.DEFAULT_LADDER, True, never_away) == "chimed", "fresh gap"
+
+
+def test_the_notification_says_since_when_and_opens_t(db, mocker):
+    notify = mocker.patch.object(bar, "notify")
+    bar.alert(db, gap_of(45), gaps.DEFAULT_LADDER, True, never_away)
+    notify.assert_called_once_with("45 min unclaimed since 14:15", bar.OPEN_T)
+
+
+def test_away_means_quiet_but_counted(db, mocker):
+    chime, notify = mocker.patch.object(bar, "chime"), mocker.patch.object(bar, "notify")
+    assert bar.alert(db, gap_of(45), gaps.DEFAULT_LADDER, True, lambda: True) == "", "away"
+    assert not chime.called and not notify.called, "no sound, no notification"
+    assert bar.unclaimed(gap_of(45), gaps.DEFAULT_LADDER).startswith("45m"), "still counting"
+
+
+def test_the_bar_command_climbs_the_ladder(run, logged, mocker):
+    logged(9, 0, "mail")
+    logged(14, 30, "")
+    chime = mocker.patch.object(bar, "chime")
+    mocker.patch.object(nudge, "user_idle", return_value=timedelta())
+    _code, out = run("bar", "/p/tally.30s.sh")
+    assert out.startswith("30m unclaimed | color=#FFCC00\n"), "the counter in the menu bar"
+    chime.assert_called_once_with()
+
+
+def test_the_bar_command_honours_the_settings(run, logged, mocker):
+    logged(9, 0, "mail")
+    logged(14, 30, "")
+    chime = mocker.patch.object(bar, "chime")
+    mocker.patch.object(nudge, "user_idle", return_value=timedelta())
+    _code, out = run("bar", "/p/x", unclaimed_ladder="10,20,40,50", unclaimed_sounds="0")
+    assert out.startswith("30m unclaimed | color=#FFCC00\n"), "30 min is the second of 10,20,40,50"
+    chime.assert_not_called()

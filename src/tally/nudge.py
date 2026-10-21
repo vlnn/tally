@@ -17,7 +17,7 @@ from typing import NamedTuple
 
 from hoard.alfred import is_on
 
-from tally import present, store
+from tally import durations, store
 
 LABEL = "com.anokhin.tally.nudge"
 TRIGGER = "nudge"
@@ -76,7 +76,7 @@ def recently_logged(db: sqlite3.Connection, now: datetime, chosen: Settings) -> 
 def wording(db: sqlite3.Connection, now: datetime) -> str:
     active = store.running(db, now)
     if active:
-        return f"Still on {active.line} · {present.hm(active.length(now))}? Ignore to keep it."
+        return f"Still on {active.line} · {durations.hm(active.length(now))}? Ignore to keep it."
     last = store.last_before(db, now)
     if last is None or last.at.date() != now.date():
         return "Nothing logged today. Type t to start."

@@ -2,18 +2,19 @@
 
 ## What is here
 
-Six small modules, each with one job, on `hoard.alfred` (folding, word-prefix matching, the
+Small modules, each with one job, on `hoard.alfred` (folding, word-prefix matching, the
 data folder) and nothing of the kernel.
 
 | Module      | Owns                                                                  | Grows when                            |
 | ----------- | --------------------------------------------------------------------- | ------------------------------------- |
 | `store`     | the table of transitions; blocks, running, tasks, spelling            | a transition gets a column, a new read |
 | `days`      | when a day starts, which day a moment is, the `@today`/`@week` words  | a new rule word                       |
-| `durations` | spans as typed (`+15`, `-10 min`, `+1h30m`, `+30s`), first or last words | a new unit |
+| `durations` | spans as typed (`+15`, `-10 min`, `+1h30m`, `+30s`), first or last words; `h:mm` | a new unit |
 | `timewords` | the last word of a line as a time                                     | a new way to say when                 |
 | `commands`  | words that name a command (stop, today, week, bar…) and their prefixes | a new command word                   |
 | `tags`      | tags in a line, aliases from the setting, time under each tag          | a tag gets a meaning beyond grouping  |
 | `nudge`     | when to nudge and what to say, the launchd agent, how long the user has been idle | a new reason to stay quiet |
+| `gaps`      | unclaimed time: the gap, the ladder and its level, display-on from `pmset`, splits | a new way to guess when a gap ended |
 | `scope`     | which tasks a list is about (all, or one tag), adding that tag, task identity across aliases | a list scoped by more than one tag |
 | `journal`   | edits as batches of ops on transitions, each batch's before-image, undo | a new kind of op |
 | `edits`     | what text typed in the edit list means for a block, a task or a day; refusals | a new edit word |
@@ -23,7 +24,7 @@ data folder) and nothing of the kernel.
 | `present`   | Alfred rows: bare list, typed list, subtitles, the effect of a backfill | a row gets a key, a new row appears  |
 | `ribbon`    | a day as cells, a range as a line per day, groups, totals, the list   | the view shows something new          |
 | `view`      | the Text View JSON and its rerun                                      | a second view                         |
-| `bar`       | the SwiftBar plugin: status line, menu, where it goes, the poke after a change | the menu gets a line |
+| `bar`       | the SwiftBar plugin: status line, unclaimed counter and its alerts, menu, the poke after a change | the menu gets a line |
 | `cli`       | subcommands, settings, the database path                              | a new subcommand, a new setting       |
 
 The canvas is `workflow/info.plist`: hotkey → script filter `t` → a conditional on `action`
@@ -76,6 +77,32 @@ and the running task as the argument; the `open` external trigger (URL handler o
 The href is one more layer of URL encoding inside the notify URL, so SwiftBar's decoding
 hands Alfred its own link intact. Alfred's notifications do nothing on click, which is why
 they stay the fallback only.
+
+## Unclaimed time
+
+A gap is not stored: `gaps.find` reads it from the transitions, the nudge hours and now, so
+there is nothing to clean up and nothing carries over a night (the gap opens with the hours,
+not at yesterday's stop). `gaps` imports only `durations` and `store`; `h:mm` moved to
+`durations` so `nudge` no longer imports `present`, which closed an import cycle
+(`nudge → present → remind → nudge`).
+
+In `t`, `cli.claim` builds a `gaps.Claim`: the gap, the first step of the ladder as threshold,
+and `woke`, a function that reads the power log. Only `claim_rows` calls it, so bare `t` and
+every row without a typed task never spawn `pmset`; the lines are cached for a minute in the
+workflow's cache folder so each keystroke does not. The display-on row is the last
+`Display is turned on` strictly inside the gap, to the minute; nothing cleverer, on purpose.
+
+A split is `gaps.split` (a comma, parts, the last part all line) and `gaps.fill` (starts from
+the gap's start, or one problem). The row and `act claim` both run them, so they cannot
+disagree; `act claim` records each start with `logged_at` now and the last one keeps running.
+
+The menu bar's ladder is `bar.alert`, run by `tally bar` every 30 s before the menu prints. It
+keeps the highest step each gap has rung in a one-row table, `ladder(start, level)`, so a step
+rings once however often the plugin runs, a jump straight to red rings only the notification,
+and a new gap (another start) clears it. Away (`HIDIdleTime` over the nudge interval) the step
+is still recorded, so coming back does not set off an old alarm. The chime is `afplay` on
+`Tink.aiff` through `Popen`, so the menu does not wait for it. With the plugin installed,
+`tally nudge` says nothing for a gap: the counter has it.
 
 ## Editing
 
@@ -130,6 +157,9 @@ never touches the database. ⌃↩ goes back into `t` with the typed text as its
 `replace` as a variable; `remember` finishes the old reminder before adding the new one.
 
 ## Deliberately not here
+
+- **Guessing more about a gap.** Activity sampling, idle-based stops, "lost time" totals, carrying
+  a gap into the next day. The gap is empty time and the person decides what it was.
 
 - **Undo of starts and stops.** `t undo` takes back edits; a start or stop from the list is
   one insert and is not journaled. ⌃↩ on the task, then `delete` on the block, is the way back.

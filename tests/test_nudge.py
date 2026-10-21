@@ -227,3 +227,16 @@ def test_notify_opens_the_url_quietly(mocker):
     opened = mocker.patch("subprocess.run")
     bar.notify("hi", "alfred://x")
     assert opened.call_args.args[0][:2] == ["open", "-g"], "in the background"
+
+
+@pytest.mark.parametrize("installed, nudged", [(True, False), (False, True)])
+def test_the_ladder_replaces_gap_nudges_with_the_plugin(run, logged, mocker, installed, nudged):
+    logged(9, 0, "mail")
+    logged(14, 30, "")
+    mocker.patch.object(nudge, "user_idle", return_value=AT_DESK)
+    mocker.patch("tally.bar.installed", return_value=installed)
+    notify = mocker.patch("tally.bar.notify")
+    _code, out = run("nudge")
+    assert bool(out.strip()) is nudged and not notify.called, (
+        "with SwiftBar the unclaimed counter speaks for gaps; without it the nudge does"
+    )

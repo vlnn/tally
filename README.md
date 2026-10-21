@@ -20,6 +20,82 @@ t st                     Stop                      parser #lexer · 0:55 since 1
 t to                     Today                     4:40 logged · ↩ shows the day
 ```
 
+## A day with tally
+
+One Tuesday, every feature once. Each line is what you type, then what Alfred (or the menu bar)
+says back. HYPER+] opens `t`, HYPER+[ opens `tw`.
+
+```
+08:55  t daily 9:00 standup ↩           Reminder set for daily 09:00: standup
+09:00                                    STANDUP across the screen in Large Type; esc
+09:00  HYPER+[ stand ↩                   standup #w from 09:00        tw adds #w by itself
+09:20  t mail ↩                          mail from 09:20              starting ends standup
+09:40  HYPER+[ parser ↩                  parser #w from 09:40
+10:05  t ↩                               mail from 10:05              the previous task is on top:
+10:15  t ↩                               parser #w from 10:15         t ↩ toggles the two
+10:30  the stop hotkey                   parser #w · 0:15             off for coffee
+```
+
+Nothing runs now, and from here the menu bar (with SwiftBar) counts the time nobody claimed:
+
+```
+10:45  menu bar                          15m unclaimed                grey
+11:00                                    30m unclaimed                yellow, and a Tink
+11:15                                    45m unclaimed                orange, and a notification:
+                                         “45 min unclaimed since 10:30”; a click opens t
+11:15  t                                 Unclaimed 0:45 since 10:30   on top of the usual list
+       t review pr 212                   Start review pr 212          ↩ from now
+                                         Start review pr 212 since 11:02   display on · 0:13
+                                         Start review pr 212 since 10:30   whole gap · 0:45
+       ↓ ↩                               review pr 212 from 11:02     you were reading it since
+                                                                      the screen woke up
+```
+
+Nothing is lost if you never answer: 10:30–11:02 stays untracked, and tomorrow starts clean.
+
+```
+12:00  t 12:45 lunch ↩                   Reminder set for 12:45: lunch
+12:45                                    LUNCH in Large Type
+12:45  t ⌥↩                              review pr 212 · 1:43         ⌥↩ stops from any row
+13:50  menu bar                          65m unclaimed                red since 13:45
+       t lunch 30, hallway chat 25, review pr 212
+                                         Claim since 12:45: lunch 12:45–13:15,
+                                         hallway chat 13:15–13:40, review pr 212 from 13:40
+       ↩                                 lunch from 12:45, hallway chat from 13:15,
+                                         review pr 212 from 13:40     the last part keeps running
+14:00  t every 45m drink water until 18:00 ↩
+                                         Reminder set for every 45 min: drink water
+14:20  HYPER+[ parser 14:05              Resume parser #w             from 14:05 · ends review pr
+       ↩                                 parser #w from 14:05         212 at 14:05 (a backfill)
+14:35                                    “Still on parser #w · 0:30? Ignore to keep it.”
+                                         a nudge (after t nudge ↩); ignoring it confirms
+14:45                                    DRINK WATER in Large Type
+14:50  t @re drink ⌥↩                    Skipping 15:30: drink water  the next one only
+16:00  t hall ↓ ⌃↩  #w ↩                 Add #w · 1 block             the chat was work after all
+16:05  t lunch ⌘↩ ↩                      Delete 1 block · 0:30        lunch is not work…
+16:06  t un ↩                            Undone: Delete 1 block · 0:30   …but keep it anyway
+16:30  t coffee -20m                     Start coffee                 from 16:10 · ends parser #w
+                                                                      at 16:10; esc, not today
+17:30  HYPER+[                           Today · 7:58 logged · #work 4:50
+       t @today ↩                        the ribbon, totals by tag, every block
+18:00  t st ↩                            parser #w · 3:55
+```
+
+And on Friday afternoon:
+
+```
+t @week ↩  t @lastweek ↩  t @month ↩     one ribbon line per day, totals, by tag
+t @yesterday ⌃↩  #w ↩                    tag every block of a day
+t parser ⌃↩  ↓ 09:40–10:05 ↩  end 10:00 ↩
+                                         End parser at 10:00 instead of 10:05: one block
+t @re standup ⌃↩                         daily 9:00 standup comes back into t:
+       weekdays 9:15 standup ↩           Replaced with weekdays 09:15: standup
+t @re drink ⇧↩                           Stopped 1 reminder: drink water
+t @                                      every @word: @today, @week, @reminders…
+t nu ↩                                   Nudges off
+t ba ↩                                   SwiftBar plugin installed · …/tally.30s.sh
+```
+
 ## Work
 
 HYPER+[ (or the keyword `tw`) opens the same list for work only:
@@ -154,6 +230,9 @@ Nothing running since 13:40. Ignore if you're away.
 Nothing logged today. Type t to start.
 ```
 
+With the SwiftBar plugin, the gap nudge (`Nothing running since…`) gives way to the unclaimed
+counter below; the `Still on…?` nudge stays.
+
 With the SwiftBar plugin installed (`t bar`), nudges come from SwiftBar and are clickable: a
 click opens `t` with the running task typed in, so its row is on top with ⌥↩ to stop it, and
 for a gap it opens the bare list with the previous task first. SwiftBar asks once for
@@ -171,6 +250,55 @@ launchd picks it up. Underneath, a launchd agent (`~/Library/LaunchAgents/com.an
 asks Alfred to run the workflow's `nudge` trigger, so the check uses the workflow's settings and
 the notification is Alfred's. The first time, macOS asks whether `osascript` may control Alfred;
 say yes.
+
+## Unclaimed time
+
+Time with nothing running, within **Nudge between** (and on weekends only with **Weekends**), is
+*unclaimed*: from today's last stop, or from the start of the hours if that is later. It is only
+empty time. Nothing is lost, the ribbon and the totals are unchanged, and nothing carries over
+to the next day. A running task is never stopped for you.
+
+**In `t`** (no SwiftBar needed), once the gap reaches the first step of **Unclaimed ladder**
+(15 min):
+
+```
+t                       Unclaimed 0:30 since 10:30       type what you are doing
+t api-design            Start api-design                 ↩ from now
+                        Start api-design since 10:42     display on · 0:18
+                        Start api-design since 10:30     whole gap · 0:30
+```
+
+↩ always means *from now* on the top row; the rows under it claim back. *Display on* is the last
+time the screen woke inside the gap (from `pmset -g log`, read only when you type and kept for a
+minute); it is left out when there is none. ⇧↩ on any resume row is the whole gap too.
+
+**A split** claims the gap for several things: parts by comma, each but the last with a length
+(`30`, `30m`, `1h`, `1h30m`), filled in order from the start of the gap; the last part has no
+length and keeps running, so `review pr 212` there is a name, not 212 minutes:
+
+```
+t standup 30, api-design        Claim since 10:30: standup 10:30–11:00, api-design from 11:00
+t standup 1h, api-design        1:00 of parts is more than the 0:40 gap
+```
+
+In `tw` every part gets the work tag. With a task running there is no gap, and a split says so.
+A comma in `t` always means a split.
+
+**In the menu bar** (with SwiftBar), the counter shows only while nothing runs and climbs the
+ladder, `15,30,45,60` by default:
+
+| From   | Menu bar                  | And                                            |
+| ------ | ------------------------- | ---------------------------------------------- |
+| 15 min | `15m unclaimed`, grey     |                                                |
+| 30 min | yellow                    | a Tink (**Unclaimed sounds** turns it off)     |
+| 45 min | orange                    | a notification: `45 min unclaimed since 10:30` |
+| 60 min | red, until claimed        | the notification once more                     |
+
+A click on the notification, or on *Claim…* at the top of the menu, opens `t` with the gap on
+top. When you are away (no key or mouse for a nudge interval) there is no sound and no
+notification, and the counter keeps counting. Each step rings once per gap; the next gap starts
+the ladder again. Run `t bar` again after changing the ladder or the hours, since the plugin
+carries the settings.
 
 ## Command words
 
@@ -194,7 +322,10 @@ nothing stored can disagree with anything else.
    `#w` counts as `#work`. Add more with commas, `w=work, l=lexer`.
 4. Optional: **Day starts at**. With `04:00`, work at one in the morning belongs to the evening
    before. Every tally is recomputed from this, so changing it changes history too.
-5. The hotkey objects are wired for HYPER+] (⌃⌥⇧⌘]) to open `t`, HYPER+[ to open `tw`, and
+5. Optional: **Unclaimed ladder** (`15,30,45,60`: the minutes at which the counter shows,
+   chimes, notifies and turns red; the first is also when `t` offers to claim) and
+   **Unclaimed sounds**.
+6. The hotkey objects are wired for HYPER+] (⌃⌥⇧⌘]) to open `t`, HYPER+[ to open `tw`, and
    nothing yet to stop. Alfred clears hotkeys on import, so double-click each once and press the
    combination you want.
 
@@ -204,10 +335,11 @@ nothing stored can disagree with anything else.
 | --------------------------------------------- | ------------------------------------------- |
 | [Alfred 5](https://www.alfredapp.com) with the Powerpack | everything: workflows need the Powerpack |
 | macOS's own `/usr/bin/python3` (3.9+)         | everything; it comes with the Command Line Tools, nothing else is installed |
-| [SwiftBar](https://github.com/swiftbar/SwiftBar), optional (`brew install swiftbar`) | the running task in the menu bar, `t bar` |
+| [SwiftBar](https://github.com/swiftbar/SwiftBar), optional (`brew install swiftbar`) | the running task in the menu bar, `t bar`, clickable nudges, the unclaimed counter and its ladder |
 
 SwiftBar is the only optional piece, and nothing else depends on it. Without it, `t`, backfill,
-stop and the views work the same; `t bar` says SwiftBar was not found instead of installing, and
+stop, the views, reminders and claiming unclaimed time in `t` work the same, and gaps get the
+plain `Nothing running since…` nudge; `t bar` says SwiftBar was not found instead of installing, and
 starting or stopping a task never tries to reach it.
 
 ## The list
@@ -224,7 +356,7 @@ are every past task matching by word prefix, newest start first, each ↩ resumi
 | Key  | On a task row                                                                       |
 | ---- | ----------------------------------------------------------------------------------- |
 | ↩    | start now                                                                           |
-| ⇧↩   | start where the last block ended, filling the gap (only when nothing is running)    |
+| ⇧↩   | start where today's gap began (the last stop, or the start of the hours), filling it |
 | ⌥↩   | stop the running task                                                               |
 | ⌘C   | copy the line                                                                       |
 | ⌘L   | large type                                                                          |
@@ -332,7 +464,7 @@ The by-tag table follows the totals, over the whole range.
 With [SwiftBar](https://github.com/swiftbar/SwiftBar) installed, `t bar` ↩ writes a plugin into
 its plugin folder (read from SwiftBar's own settings, or from **SwiftBar plugins** if that
 fails). The menu bar then shows the running task and its time, `parser #lexer 1:42`, or
-`tally` when nothing runs, refreshed every thirty seconds and the moment you start or stop
+the unclaimed counter (`30m unclaimed`) or `tally` when nothing runs, refreshed every thirty seconds and the moment you start or stop
 anything from Alfred. Its menu is the bare `t` list: Stop, the recent tasks (click resumes),
 Today, Open Tally, and at the bottom SwiftBar's own submenu for its preferences, refresh and
 quit.
@@ -351,6 +483,7 @@ uv run tally filter "par" | jq '.items[].title'
 uv run tally act start "parser #lexer"
 at=2026-10-20T14:05 uv run tally act start "parser #lexer"
 uv run tally act stop
+uv run tally act claim "standup 30, api-design"
 uv run tally today            # or today @yesterday, today @week, today 2026-10-19
 ```
 

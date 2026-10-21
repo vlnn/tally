@@ -5,17 +5,18 @@ import os
 import sqlite3
 import sys
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable
 
-from hoard.alfred import data_folder
+from hoard.alfred import data_folder, is_on
 
 from tally import (
     bar,
     days,
     editrows,
     edits,
+    gaps,
     journal,
     nudge,
     present,
@@ -74,8 +75,33 @@ def listed(text: str, ctx: Context, chosen: scope.Scope) -> int:
     plugin = lambda: bar.plugin_path(ctx.env)  # noqa: E731
     nudges = lambda: (nudge.installed(), nudge.describe(nudge.settings(ctx.env)))  # noqa: E731
     replacing = replaced(ctx)
-    found = present.rows(text, ctx.db, ctx.now, ctx.starts, plugin, nudges, chosen, replacing)
+    found = present.rows(
+        text, ctx.db, ctx.now, ctx.starts, plugin, nudges, chosen, replacing, claim(ctx)
+    )
     return emit(found)
+
+
+def gap(ctx: Context) -> gaps.Gap | None:
+    return gaps.find(ctx.db, ctx.now, nudge.settings(ctx.env))
+
+
+def ladder(ctx: Context) -> tuple[int, ...]:
+    return gaps.ladder(ctx.env.get("unclaimed_ladder", ""))
+
+
+def pmset_cache(ctx: Context) -> Path | None:
+    folder = ctx.env.get("alfred_workflow_cache", "").strip()
+    return Path(folder) / "display-on.log" if folder else None
+
+
+def claim(ctx: Context) -> gaps.Claim | None:
+    """Unclaimed time to offer in t, with when the display came on looked up only if asked."""
+    found = gap(ctx)
+    if found is None:
+        return None
+    first = timedelta(minutes=ladder(ctx)[0])
+    woke = lambda: gaps.display_on(gaps.pmset_lines(pmset_cache(ctx), ctx.now), found)  # noqa: E731
+    return gaps.Claim(found, first, woke)
 
 
 def replaced(ctx: Context) -> remind.Reminder | None:
@@ -107,6 +133,21 @@ def start_command(args: list[str], ctx: Context) -> int:
     return say(f"{line} from {at:%H:%M}")
 
 
+def claim_command(args: list[str], ctx: Context) -> int:
+    """A split over the gap: each part from where the one before it ends, the last running on."""
+    parts = gaps.split(" ".join(args))
+    found = gap(ctx)
+    if not parts or found is None:
+        return say("Nothing unclaimed to split")
+    filled = gaps.fill(parts, found)
+    if filled.problem:
+        return say(filled.problem)
+    for at, line in filled.starts:
+        store.record(ctx.db, at, line, ctx.now)
+    bar.poke(ctx.env)
+    return say(", ".join(f"{line} from {at:%H:%M}" for at, line in filled.starts))
+
+
 def keep_command(args: list[str], ctx: Context) -> int:
     active = store.running(ctx.db, ctx.now)
     if active is None:
@@ -127,7 +168,11 @@ def stop_command(args: list[str], ctx: Context) -> int:
 
 def bar_command(args: list[str], ctx: Context) -> int:
     plugin = args[0] if args else bar.PLUGIN
-    return say(bar.menu(ctx.db, ctx.now, ctx.starts, plugin))
+    found, steps = gap(ctx), ladder(ctx)
+    chosen = nudge.settings(ctx.env)
+    sounds = is_on(ctx.env.get("unclaimed_sounds", "1"))
+    bar.alert(ctx.db, found, steps, sounds, lambda: nudge.away(nudge.user_idle(), chosen))
+    return say(bar.menu(ctx.db, ctx.now, ctx.starts, plugin, found, steps))
 
 
 def install_bar_command(args: list[str], ctx: Context) -> int:
@@ -140,6 +185,8 @@ def install_bar_command(args: list[str], ctx: Context) -> int:
 def nudge_command(args: list[str], ctx: Context) -> int:
     said = nudge.message(ctx.db, ctx.now, nudge.settings(ctx.env), nudge.user_idle())
     if not said:
+        return 0
+    if bar.installed(ctx.env) and store.running(ctx.db, ctx.now) is None:
         return 0
     if bar.installed(ctx.env):
         bar.refresh()
@@ -270,6 +317,7 @@ Command = Callable[[list[str], Context], int]
 
 ACTIONS: dict[str, Command] = {
     "start": start_command,
+    "claim": claim_command,
     "keep": keep_command,
     "stop": stop_command,
     "bar": install_bar_command,
