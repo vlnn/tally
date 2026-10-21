@@ -500,4 +500,10 @@ make lint                                ruff, mypy
 make check                               build, import from the bundle, smoke it
 ```
 
+CI (`.github/workflows/ci.yml`) runs lint and the lock check, the tests on 3.9 and 3.13 on Linux
+and on macOS's own `/usr/bin/python3`, then builds the workflow on macOS and smokes the bundle
+with that interpreter. Every push to the default branch replaces the `latest` prerelease with
+the new `Tally.alfredworkflow`; a `v*` tag makes a release. Each run keeps the workflow as an
+artifact too.
+
 `NOTES.md` lists what is deliberately not here yet and where it would go.

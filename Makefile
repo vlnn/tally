@@ -1,5 +1,7 @@
 .PHONY: test lint build check clean
 
+SMOKE_PYTHON ?= /usr/bin/env python3
+
 test:
 	uv run pytest
 
@@ -13,7 +15,7 @@ build:
 
 check: build
 	uv run --python 3.13 python -m hoard.build --check
-	/usr/bin/env python3 scripts/smoke.py dist/tally.alfredworkflow
+	$(SMOKE_PYTHON) scripts/smoke.py dist/tally.alfredworkflow
 
 clean:
 	rm -rf dist .pytest_cache .ruff_cache .mypy_cache
