@@ -37,3 +37,12 @@ def logged(db):
 @pytest.fixture
 def sample(logged):
     return [logged(*entry) for entry in DAY]
+
+
+@pytest.fixture(autouse=True)
+def no_mac(mocker):
+    """The suite never reaches the machine it runs on: no `defaults`, `ioreg`, `pmset`,
+    `launchctl`, `open` or `afplay`. A test that wants one of them patches it itself."""
+    absent = mocker.MagicMock(returncode=1, stdout="")
+    mocker.patch("subprocess.run", return_value=absent)
+    mocker.patch("subprocess.Popen")

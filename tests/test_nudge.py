@@ -141,6 +141,7 @@ def run(db, capsys):
 
 def test_nudge_prints_the_message_for_alfreds_notification(run, sample, mocker):
     mocker.patch.object(nudge, "user_idle", return_value=AT_DESK)
+    mocker.patch("tally.bar.installed", return_value=False)
     mocker.patch("tally.bar.poke")
     _code, out = run("nudge")
     assert out.strip() == "Still on parser #lexer · 0:55? Ignore to keep it.", "the notification"
