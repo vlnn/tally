@@ -86,10 +86,34 @@ def record(db: sqlite3.Connection, at: datetime, line: str, now: datetime) -> Tr
         "insert into transitions (at, line, logged_at) values (?, ?, ?)",
         (stamp(at), tidy(line), stamp(now)),
     )
-    for identity in redundant(transitions(db)):
+    for identity in redundant(neighbours(db, at)):
         db.execute("delete from transitions where id = ?", (identity,))
     db.commit()
     return Transition(cursor.lastrowid or 0, at, tidy(line), now)
+
+
+REACH = 4
+
+
+def neighbours(db: sqlite3.Connection, at: datetime, reach: int = REACH) -> list[Transition]:
+    """The transitions around a moment: `reach` tasks before it to `reach` transitions after.
+
+    Redundancy is decided against neighbours only, so this is all a write needs to tidy.
+    The window opens on a task, never a stop, so a stop inside it has the predecessor the
+    rule compares it with.
+    """
+    before = db.execute(
+        "select at from transitions where at <= ? and line != ''"
+        " order by at desc, id desc limit 1 offset ?",
+        (stamp(at), reach),
+    ).fetchone()
+    after = db.execute(
+        "select at from transitions where at > ? order by at, id limit 1 offset ?",
+        (stamp(at), reach),
+    ).fetchone()
+    since = datetime.fromisoformat(before[0]) if before else datetime.min
+    until = datetime.fromisoformat(after[0]) if after else None
+    return transitions(db, since, until)
 
 
 def redundant(changes: list[Transition]) -> list[int]:
@@ -150,9 +174,11 @@ def blocks(changes: Iterable[Transition]) -> list[Block]:
 def blocks_within(
     db: sqlite3.Connection, since: datetime, until: datetime, now: datetime
 ) -> list[Block]:
+    straddling = last_before(db, since)
+    first = straddling.at if straddling else since
     return [
         block.clipped(since, until, now)
-        for block in blocks(transitions(db, None, until))
+        for block in blocks(transitions(db, first, until))
         if (block.end or now) > since and block.start < until
     ]
 

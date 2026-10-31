@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from conftest import NO_OFFSET, NOW
+from conftest import NO_OFFSET, NOW, TODAY
 from tally import cli, editrows, edits, journal, present, store
 from tally.scope import Scope
 
@@ -361,4 +361,50 @@ def test_retimed_blocks_read_as_backfilled_when_moved_far_back(db, sample):
     moved = next(b for b in store.blocks(store.transitions(db)) if b.id == PARSER)
     assert moved.start == datetime(2026, 10, 20, 10, 30) and moved.backfilled, (
         "an earlier start than when it was logged is honest about it"
+    )
+
+
+def test_apply_tidies_around_what_it_changed(db, logged):
+    logged(9, 0, "mail")
+    logged(9, 30, "parser")
+    logged(10, 0, "")
+    parser = store.transitions(db)[1]
+    journal.apply(db, [journal.update(parser.id, line="mail")], "rename", NOW)
+    assert [(f"{t.at:%H:%M}", t.line) for t in store.transitions(db)] == [
+        ("09:00", "mail"),
+        ("10:00", ""),
+    ], "renamed to the task before it, the block merges into it"
+
+
+def test_apply_leaves_distant_duplicates_alone(db, logged):
+    long_ago = TODAY - timedelta(days=400)
+    at = datetime(long_ago.year, long_ago.month, long_ago.day, 9, 0)
+    for hour in (9, 10):
+        db.execute(
+            "insert into transitions (at, line, logged_at) values (?, ?, ?)",
+            (store.stamp(at.replace(hour=hour)), "mail", store.stamp(at)),
+        )
+    for hour in range(8, 8 + store.REACH + 1):
+        today = datetime(TODAY.year, TODAY.month, TODAY.day, hour)
+        db.execute(
+            "insert into transitions (at, line, logged_at) values (?, ?, ?)",
+            (store.stamp(today), f"task {hour}", store.stamp(today)),
+        )
+    before = len(store.transitions(db))
+    journal.apply(db, [journal.insert(NOW, "review")], "add", NOW)
+    assert len(store.transitions(db)) == before + 1, (
+        "an edit tidies its own neighbourhood; history far from it is untouched"
+    )
+
+
+def test_undo_survives_a_transition_in_two_windows(db, logged):
+    logged(9, 0, "mail")
+    logged(9, 30, "parser")
+    logged(10, 0, "mail")
+    parser = store.transitions(db)[1]
+    journal.apply(db, [journal.update(parser.id, line="mail")], "rename", NOW)
+    assert len(store.transitions(db)) == 1, "three blocks of mail become one"
+    journal.undo(db)
+    assert [t.line for t in store.transitions(db)] == ["mail", "parser", "mail"], (
+        "undo puts every row back exactly once"
     )

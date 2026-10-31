@@ -141,8 +141,11 @@ shows `{query}` literally, double-click the object and set its text to `{query}`
 `store.redundant` is the one rule for what changes nothing: of transitions sharing a minute
 only the last counts, a transition repeating the task before it (or a stop after a stop, or a
 stop before anything) is dropped. `store.record` deletes them after each insert; `journal.apply`
-deletes them inside its batch, so undo brings them back with the rest. Old data is tidied by
-the next write, whatever it is.
+deletes them inside its batch, so undo brings them back with the rest. The rule only ever
+compares a transition with its neighbours, so both look at `store.neighbours`, a few
+transitions either side of the moment written (opening on a task, so a stop in the window
+has its predecessor), instead of the whole table: a write costs the same in year ten as on
+day one. Old untidy data is tidied by the next write near it, not by any write.
 
 ## Repeating reminders
 

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from conftest import NOW
+from conftest import NOW, TODAY
 from tally import store
 
 
@@ -148,4 +148,85 @@ def test_redundant_finds_the_lot_in_old_data(db):
         )
     assert store.redundant(store.transitions(db)) == [3, 4, 2], (
         "two zero-minute switches and the repeated start"
+    )
+
+
+def planted(db, hour, minute, line, day=TODAY):
+    at = datetime(day.year, day.month, day.day, hour, minute)
+    db.execute(
+        "insert into transitions (at, line, logged_at) values (?, ?, ?)",
+        (store.stamp(at), line, store.stamp(at)),
+    )
+
+
+def test_neighbours_are_a_window_around_a_moment(db, logged):
+    for hour in range(8, 18):
+        logged(hour, 0, f"task {hour}")
+    found = store.neighbours(db, datetime(2026, 10, 20, 13, 0), reach=2)
+    assert [t.at.hour for t in found] == [11, 12, 13, 14, 15], (
+        "two before, the moment itself and two after"
+    )
+
+
+def test_neighbours_start_on_a_task_not_a_stop(db, logged):
+    logged(9, 0, "mail")
+    logged(9, 30, "")
+    logged(10, 0, "parser")
+    found = store.neighbours(db, datetime(2026, 10, 20, 10, 0), reach=1)
+    assert [(t.at.hour, t.line) for t in found] == [(9, "mail"), (9, ""), (10, "parser")], (
+        "the window opens on a task, so a stop inside it has its predecessor"
+    )
+
+
+@pytest.mark.parametrize(
+    "planted_rows, expected",
+    [
+        ([(9, 0, "mail"), (9, 30, ""), (9, 45, "")], [("09:00", "mail"), ("09:30", "")]),
+        ([(9, 0, "mail"), (10, 0, "mail")], [("09:00", "mail")]),
+        ([(9, 0, "mail"), (9, 0, "parser")], [("09:00", "parser")]),
+    ],
+)
+def test_record_tidies_what_it_touches(db, logged, planted_rows, expected):
+    for hour, minute, line in planted_rows:
+        planted(db, hour, minute, line)
+    logged(15, 0, "review")
+    assert timeline(db)[:-1] == expected, "the neighbourhood of a write is left tidy"
+
+
+def test_record_leaves_distant_history_alone(db, logged):
+    long_ago = TODAY - timedelta(days=400)
+    planted(db, 9, 0, "mail", long_ago)
+    planted(db, 10, 0, "mail", long_ago)
+    for hour in range(8, 8 + store.REACH + 1):
+        planted(db, hour, 0, f"task {hour}")
+    logged(15, 0, "review")
+    assert len(store.transitions(db)) == store.REACH + 4, (
+        "a start only tidies around itself, so an old duplicate is not its business"
+    )
+
+
+def test_record_reads_a_window_not_the_table(db, logged, mocker):
+    for hour in range(8, 15):
+        logged(hour, 0, f"task {hour}")
+    read = mocker.spy(store, "transitions")
+    logged(15, 0, "review")
+    bounded = [call for call in read.call_args_list if call.args[1] is not None]
+    assert bounded and len(read.call_args_list) == len(bounded), (
+        "every read made by a start is bounded below"
+    )
+
+
+def test_blocks_within_read_from_the_block_straddling_the_window(db, logged, mocker):
+    long_ago = TODAY - timedelta(days=400)
+    logged(9, 0, "ancient", long_ago)
+    logged(10, 0, "", long_ago)
+    logged(23, 30, "night shift", TODAY - timedelta(days=1))
+    logged(9, 0, "mail")
+    read = mocker.spy(store, "transitions")
+    found = store.blocks_within(db, datetime.combine(TODAY, datetime.min.time()), NOW, NOW)
+    assert [b.line for b in found] == ["night shift", "mail"], (
+        "a block that started yesterday and ran into today is clipped in, not lost"
+    )
+    assert all(call.args[1] is not None for call in read.call_args_list), (
+        "the read starts at the straddling block, not at the beginning of history"
     )

@@ -367,7 +367,7 @@ counting from when it began. ⌥↩ on that row stops it and ⌃↩ edits it.
 
 A start that changes nothing is not kept: the same task again right after itself (one block,
 not two), switches undone within the same minute (no 0:00 blocks), a stop after a stop. Any
-start, stop or edit tidies these away, older ones included.
+start, stop or edit tidies these away around the moment it touches.
 
 Two tasks are the same task when their lines are the same after folding case, diacritics and
 spacing. `parser #lexer` and `parser` are two tasks. A `#tag` anywhere in the line groups the

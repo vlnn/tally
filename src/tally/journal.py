@@ -57,16 +57,37 @@ def carry_out(db: sqlite3.Connection, op: Op, batch: int, now: datetime) -> None
         db.execute("update transitions set line = ? where id = ?", (store.tidy(op.line), op.id))
 
 
+def moment_of(db: sqlite3.Connection, op: Op) -> datetime | None:
+    if not op.id:
+        return None
+    row = db.execute("select at from transitions where id = ?", (op.id,)).fetchone()
+    return datetime.fromisoformat(row[0]) if row else None
+
+
+def touched(db: sqlite3.Connection, ops: list[Op]) -> list[datetime]:
+    """Every moment an op reaches: where a row was, and where it goes."""
+    moments = [moment_of(db, op) for op in ops] + [op.at for op in ops]
+    return list(dict.fromkeys(m for m in moments if m is not None))
+
+
+def tidy(db: sqlite3.Connection, moments: list[datetime], batch: int, now: datetime) -> None:
+    gone: set[int] = set()
+    for moment in moments:
+        gone.update(store.redundant(store.neighbours(db, moment)))
+    for identity in gone:
+        carry_out(db, delete(identity), batch, now)
+
+
 def apply(db: sqlite3.Connection, ops: list[Op], said: str, now: datetime) -> int:
     with db:
         batch = db.execute(
             "insert into batches (said, at) values (?, ?)", (said, store.stamp(now))
         ).lastrowid
         assert batch is not None
+        moments = touched(db, ops)
         for op in ops:
             carry_out(db, op, batch, now)
-        for identity in store.redundant(store.transitions(db)):
-            carry_out(db, delete(identity), batch, now)
+        tidy(db, moments, batch, now)
     return batch
 
 
